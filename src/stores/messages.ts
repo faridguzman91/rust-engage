@@ -1,6 +1,9 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { useContactsStore } from "./contacts";
+import { useIdentityStore } from "./identity";
+import { useServerApi } from "../composables/useServerApi";
 
 export interface Message {
   id: string;
@@ -21,7 +24,31 @@ export const useMessagesStore = defineStore("messages", () => {
   }
 
   async function send(conversationId: string, body: string): Promise<Message> {
+    const contacts = useContactsStore();
+    const identity = useIdentityStore();
+    const api = useServerApi();
+
+    // 1. Establish X3DH session with contact if not yet done.
+    //    ensureSession returns the ephemeral key on first call (null after that).
+    const ephemeralKey = await contacts.ensureSession(conversationId);
+
+    // 2. Encrypt through the Double Ratchet (returns ratchet ciphertext JSON)
+    const encrypted = await invoke<{ ciphertext: string; messageType: number }>(
+      "encrypt_message",
+      { contactId: conversationId, plaintext: body }
+    );
+
+    // 3. Relay sealed envelope to server — server is an opaque forwarder
+    await api.sendEnvelope({
+      recipientId: conversationId,
+      senderIk: identity.keys?.identityPublicKey ?? "",
+      ephemeralKey: ephemeralKey ?? undefined,
+      ciphertext: encrypted.ciphertext,
+    });
+
+    // 4. Persist locally and return to UI
     const msg = await invoke<Message>("send_message", { conversationId, body });
+
     if (!byConversation.value[conversationId]) {
       byConversation.value[conversationId] = [];
     }
@@ -33,7 +60,10 @@ export const useMessagesStore = defineStore("messages", () => {
     if (!byConversation.value[msg.conversationId]) {
       byConversation.value[msg.conversationId] = [];
     }
-    byConversation.value[msg.conversationId].push(msg);
+    const exists = byConversation.value[msg.conversationId].some((m) => m.id === msg.id);
+    if (!exists) {
+      byConversation.value[msg.conversationId].push(msg);
+    }
   }
 
   function forConversation(id: string): Message[] {

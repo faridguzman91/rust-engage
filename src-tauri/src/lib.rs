@@ -34,6 +34,7 @@ pub fn run() {
             commands::crypto::encrypt_message,
             commands::crypto::decrypt_message,
             commands::crypto::init_session,
+            commands::crypto::init_inbound_session,
         ])
         .run(tauri::generate_context!())
         .expect("error while running engage");

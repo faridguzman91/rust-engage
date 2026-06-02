@@ -138,6 +138,38 @@ pub fn encrypt_message(
     }))
 }
 
+/// Recipient: establish an inbound session from a first-message X3DH envelope.
+/// Called by the frontend when it receives a WebSocket message that contains an ephemeralKey.
+#[tauri::command]
+pub fn init_inbound_session(
+    contact_id: String,
+    sender_ik: String,
+    ephemeral_key: String,
+    state: State<AppState>,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+
+    let (ik_priv_blob, spk_priv_blob): (Vec<u8>, Vec<u8>) = db
+        .query_row(
+            "SELECT private_key, spk_private FROM identity WHERE id=1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|e| e.to_string())?;
+
+    let sender_ik_bytes = B64.decode(&sender_ik).map_err(|e| e.to_string())?;
+    let ek_bytes = B64.decode(&ephemeral_key).map_err(|e| e.to_string())?;
+
+    let manager = SessionManager::new(&db);
+    manager.init_inbound_session(
+        &contact_id,
+        &ik_priv_blob,
+        &spk_priv_blob,
+        &sender_ik_bytes,
+        &ek_bytes,
+    )
+}
+
 /// Decrypt a ratchet message from a contact.
 #[tauri::command]
 pub fn decrypt_message(
