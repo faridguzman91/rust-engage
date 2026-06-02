@@ -1,5 +1,5 @@
 use rusqlite::params;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tauri::State;
 
 use crate::AppState;

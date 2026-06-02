@@ -3,7 +3,7 @@ use ed25519_dalek::SigningKey;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
 
-use super::keys::{generate_signed_prekey, KeyPair};
+use super::keys::generate_signed_prekey;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IdentityBundle {

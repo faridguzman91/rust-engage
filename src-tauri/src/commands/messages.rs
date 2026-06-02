@@ -4,6 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::State;
 use uuid::Uuid;
 
+use crate::crypto::session::SessionManager;
 use crate::AppState;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -66,22 +67,31 @@ pub fn send_message(
     let id = Uuid::new_v4().to_string();
     let ts = now_ms();
 
-    // TODO: encrypt body with session key before storing/sending
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+
+    // Encrypt with the ratchet session if one exists; otherwise store plaintext (pre-session state).
+    let stored_body = {
+        let manager = SessionManager::new(&db);
+        match manager.encrypt(&conversation_id, body.as_bytes()) {
+            Ok(ciphertext_json) => ciphertext_json,
+            Err(_) => body.clone(), // no session yet — store plaintext until session is established
+        }
+    };
+
     let msg = Message {
         id: id.clone(),
         conversation_id: conversation_id.clone(),
         sender_id: "me".into(),
-        body: body.clone(),
+        body: body.clone(), // return plaintext to UI
         timestamp: ts,
         status: "sent".into(),
         is_mine: true,
     };
 
-    let db = state.db.lock().map_err(|e| e.to_string())?;
     db.execute(
         "INSERT INTO messages (id, conversation_id, sender_id, body, timestamp, status, is_mine)
          VALUES (?1,?2,?3,?4,?5,?6,?7)",
-        params![id, conversation_id, "me", body, ts, "sent", 1],
+        params![id, conversation_id, "me", stored_body, ts, "sent", 1],
     )
     .map_err(|e| e.to_string())?;
 

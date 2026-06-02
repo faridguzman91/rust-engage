@@ -1,8 +1,8 @@
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
-use ed25519_dalek::{SigningKey, VerifyingKey};
+use ed25519_dalek::{Signer, SigningKey};
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
-use x25519_dalek::{EphemeralSecret, PublicKey, StaticSecret};
+use x25519_dalek::{PublicKey, StaticSecret};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyPair {

@@ -1,4 +1,4 @@
-use rusqlite::{Connection, Result, params};
+use rusqlite::{Connection, Result};
 use std::path::Path;
 
 pub fn open(path: &Path) -> Result<Connection> {
@@ -38,6 +38,18 @@ fn migrate(conn: &Connection) -> Result<()> {
             is_mine         INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id, timestamp);
+
+        CREATE TABLE IF NOT EXISTS sessions (
+            contact_id  TEXT PRIMARY KEY,
+            state_json  TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS one_time_prekeys (
+            key_id      INTEGER PRIMARY KEY,
+            public_key  TEXT NOT NULL,
+            private_key BLOB NOT NULL,
+            used        INTEGER NOT NULL DEFAULT 0
+        );
         ",
     )
 }
