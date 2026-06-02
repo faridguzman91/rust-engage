@@ -2,7 +2,6 @@ import { SERVER_BASE } from "../config";
 import type { PreKeyBundle } from "./useCrypto";
 
 export interface RegisterPayload {
-  userId: string;
   displayName: string;
   identityKey: string;
   signedPreKey: { keyId: number; publicKey: string; signature: string };
@@ -18,16 +17,28 @@ export interface SendEnvelopePayload {
   ciphertext: string;
 }
 
-async function request<T>(
-  method: string,
-  path: string,
-  body?: unknown
-): Promise<T> {
+function getToken(): string | null {
+  return localStorage.getItem("engage_jwt");
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (body) headers["Content-Type"] = "application/json";
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
   const res = await fetch(`${SERVER_BASE}${path}`, {
     method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
+
+  if (res.status === 401) {
+    // Token expired — clear it so the router redirects to login
+    localStorage.removeItem("engage_jwt");
+    window.location.hash = "#/login";
+    throw new Error("session expired");
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
     throw new Error(`${method} ${path} → ${res.status}: ${text}`);
@@ -47,10 +58,7 @@ export function useServerApi() {
     return request("GET", `/api/keys/${encodeURIComponent(userId)}`);
   }
 
-  async function uploadPreKeys(
-    userId: string,
-    keys: { keyId: number; publicKey: string }[]
-  ): Promise<void> {
+  async function uploadPreKeys(userId: string, keys: { keyId: number; publicKey: string }[]): Promise<void> {
     return request("POST", `/api/keys/${encodeURIComponent(userId)}/prekeys`, keys);
   }
 

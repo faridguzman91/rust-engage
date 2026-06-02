@@ -4,6 +4,10 @@ import { useMessagesStore } from "../stores/messages";
 import type { Message } from "../stores/messages";
 import { SERVER_WS } from "../config";
 
+function getToken(): string {
+  return localStorage.getItem("engage_jwt") ?? "";
+}
+
 type WSStatus = "disconnected" | "connecting" | "connected";
 
 // Module-level singleton so all components share one socket
@@ -27,7 +31,8 @@ export function useWebSocket() {
     if (socket?.readyState === WebSocket.OPEN) return;
 
     status.value = "connecting";
-    socket = new WebSocket(`${SERVER_WS}/ws/${encodeURIComponent(userId!)}`);
+    const token = encodeURIComponent(getToken());
+    socket = new WebSocket(`${SERVER_WS}/ws/${encodeURIComponent(userId!)}?token=${token}`);
 
     socket.onopen = () => {
       status.value = "connected";
