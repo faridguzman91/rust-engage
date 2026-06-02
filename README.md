@@ -1,4 +1,8 @@
-# engage
+<p align="center">
+  <img src="engage.png" alt="engage" width="480" />
+</p>
+
+---
 
 End-to-end encrypted desktop chat — built with Tauri 2, Vue 3, and Rust.
 
