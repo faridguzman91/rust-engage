@@ -1,24 +1,38 @@
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        Path, State,
+        Path, Query, State,
     },
+    http::StatusCode,
     response::IntoResponse,
 };
 use futures_util::{sink::SinkExt, stream::StreamExt};
+use serde::Deserialize;
 use tokio::sync::mpsc;
-use tracing::{info, warn};
+use tracing::info;
 
-use crate::models::WsEnvelope;
+use crate::auth::verify_jwt;
 use crate::state::AppState;
 
-/// GET /ws/:user_id  — WebSocket upgrade endpoint
+#[derive(Deserialize)]
+pub struct WsQuery {
+    token: String,
+}
+
+/// GET /ws/:user_id?token=JWT
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
     Path(user_id): Path<String>,
+    Query(query): Query<WsQuery>,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
-    ws.on_upgrade(move |socket| handle_socket(socket, user_id, state))
+    // Validate JWT before upgrading — WebSocket handshakes can't use Authorization headers
+    match verify_jwt(&state.oauth.jwt_secret, &query.token) {
+        Ok(claims) if claims.sub == user_id => {
+            ws.on_upgrade(move |socket| handle_socket(socket, user_id, state))
+        }
+        _ => (StatusCode::UNAUTHORIZED, "invalid token").into_response(),
+    }
 }
 
 async fn handle_socket(socket: WebSocket, user_id: String, state: AppState) {
@@ -28,7 +42,6 @@ async fn handle_socket(socket: WebSocket, user_id: String, state: AppState) {
     state.connections.insert(user_id.clone(), tx);
     info!("WS connected: {user_id}");
 
-    // Spawn a task to forward outbound messages from the mpsc channel to the socket
     let send_task = tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
             if sender.send(msg).await.is_err() {
@@ -37,22 +50,10 @@ async fn handle_socket(socket: WebSocket, user_id: String, state: AppState) {
         }
     });
 
-    // Read inbound messages (client ACKs, keepalives)
     while let Some(Ok(msg)) = receiver.next().await {
         match msg {
-            Message::Text(text) => {
-                if let Ok(envelope) = serde_json::from_str::<serde_json::Value>(&text) {
-                    if envelope.get("type").and_then(|t| t.as_str()) == Some("ack") {
-                        // Client acknowledging a delivered message — nothing to do server-side
-                        // (already marked delivered on fetch)
-                    }
-                }
-            }
             Message::Close(_) => break,
-            Message::Ping(payload) => {
-                // pong is handled automatically by axum
-                let _ = payload;
-            }
+            Message::Ping(p) => { let _ = p; }
             _ => {}
         }
     }

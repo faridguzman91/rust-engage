@@ -1,19 +1,21 @@
+mod auth;
 mod db;
 mod models;
 mod routes;
 mod state;
 
-use axum::{
-    routing::{get, post},
-    Router,
-};
+use axum::{middleware, routing::{get, post}, Router};
 use std::net::SocketAddr;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::EnvFilter;
 
+use state::{AppState, OAuthConfig};
+
 #[tokio::main]
 async fn main() {
+    dotenvy::dotenv().ok();
+
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::from_default_env()
@@ -23,23 +25,42 @@ async fn main() {
 
     let db_path = std::env::var("DATABASE_PATH").unwrap_or_else(|_| "engage-server.db".into());
     let conn = db::open(std::path::Path::new(&db_path)).expect("failed to open database");
-    let app_state = state::AppState::new(conn);
+
+    let oauth = OAuthConfig {
+        client_id: std::env::var("GOOGLE_CLIENT_ID").expect("GOOGLE_CLIENT_ID required"),
+        client_secret: std::env::var("GOOGLE_CLIENT_SECRET").expect("GOOGLE_CLIENT_SECRET required"),
+        redirect_uri: std::env::var("GOOGLE_REDIRECT_URI")
+            .unwrap_or_else(|_| "http://localhost:3000/api/auth/google/callback".into()),
+        jwt_secret: std::env::var("JWT_SECRET").expect("JWT_SECRET required"),
+    };
+
+    let app_state = AppState::new(conn, oauth);
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let app = Router::new()
-        // Key server endpoints
+    // Public routes — no auth required
+    let public = Router::new()
+        .route("/api/auth/google", get(routes::oauth::start))
+        .route("/api/auth/google/callback", get(routes::oauth::callback));
+
+    // Protected routes — JWT required
+    let protected = Router::new()
         .route("/api/register", post(routes::keys::register))
         .route("/api/keys/{user_id}", get(routes::keys::get_prekey_bundle))
         .route("/api/keys/{user_id}/prekeys", post(routes::keys::upload_prekeys))
-        // Message relay endpoints
         .route("/api/messages", post(routes::messages::send_message))
         .route("/api/messages/{user_id}", get(routes::messages::fetch_messages))
-        // WebSocket real-time delivery
         .route("/ws/{user_id}", get(routes::ws::ws_handler))
+        .layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            auth::require_auth,
+        ));
+
+    let app = public
+        .merge(protected)
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(app_state);

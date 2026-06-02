@@ -1,11 +1,12 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Extension, Path, State},
     http::StatusCode,
     Json,
 };
 use rusqlite::params;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::auth::Claims;
 use crate::models::*;
 use crate::state::AppState;
 
@@ -16,19 +17,21 @@ fn now() -> i64 {
         .as_secs() as i64
 }
 
-/// POST /api/register
+/// POST /api/register — upload crypto keys for the authenticated user
 pub async fn register(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Json(req): Json<RegisterRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     let db = state.db.lock().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    // user_id is always taken from the JWT — client cannot spoof it
     db.execute(
         "INSERT OR REPLACE INTO devices
          (user_id, display_name, identity_key, spk_public, spk_signature, reg_id, registered_at)
          VALUES (?1,?2,?3,?4,?5,?6,?7)",
         params![
-            req.user_id,
+            claims.sub,
             req.display_name,
             req.identity_key,
             req.signed_prekey.public_key,
@@ -42,7 +45,7 @@ pub async fn register(
     for otpk in &req.one_time_prekeys {
         db.execute(
             "INSERT OR IGNORE INTO one_time_prekeys (user_id, key_id, public_key) VALUES (?1,?2,?3)",
-            params![req.user_id, otpk.key_id, otpk.public_key],
+            params![claims.sub, otpk.key_id, otpk.public_key],
         )
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     }
@@ -50,9 +53,10 @@ pub async fn register(
     Ok(StatusCode::CREATED)
 }
 
-/// GET /api/keys/:user_id  — fetch a prekey bundle
+/// GET /api/keys/:user_id — fetch a prekey bundle (any authenticated user can fetch any bundle)
 pub async fn get_prekey_bundle(
     State(state): State<AppState>,
+    Extension(_claims): Extension<Claims>,
     Path(user_id): Path<String>,
 ) -> Result<Json<PreKeyBundle>, (StatusCode, String)> {
     let db = state.db.lock().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -65,7 +69,6 @@ pub async fn get_prekey_bundle(
         )
         .map_err(|_| (StatusCode::NOT_FOUND, "user not found".into()))?;
 
-    // Atomically claim one unused one-time prekey
     let otpk = db
         .query_row(
             "SELECT id, key_id, public_key FROM one_time_prekeys
@@ -75,37 +78,33 @@ pub async fn get_prekey_bundle(
         )
         .ok()
         .and_then(|(row_id, key_id, pub_key)| {
-            db.execute(
-                "UPDATE one_time_prekeys SET used=1 WHERE id=?1",
-                params![row_id],
-            )
-            .ok()?;
+            db.execute("UPDATE one_time_prekeys SET used=1 WHERE id=?1", params![row_id]).ok()?;
             Some(OneTimePreKey { key_id, public_key: pub_key })
         });
 
     Ok(Json(PreKeyBundle {
         registration_id: reg_id,
         identity_key,
-        signed_prekey: SignedPreKey {
-            key_id: 1,
-            public_key: spk_pub,
-            signature: spk_sig,
-        },
+        signed_prekey: SignedPreKey { key_id: 1, public_key: spk_pub, signature: spk_sig },
         one_time_prekey: otpk,
     }))
 }
 
-/// POST /api/keys/:user_id/prekeys  — replenish one-time prekeys
+/// POST /api/keys/:user_id/prekeys — replenish OPKs (only owner can upload their own keys)
 pub async fn upload_prekeys(
     State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
     Path(user_id): Path<String>,
     Json(keys): Json<Vec<OneTimePreKey>>,
 ) -> Result<StatusCode, (StatusCode, String)> {
+    if claims.sub != user_id {
+        return Err((StatusCode::FORBIDDEN, "cannot upload keys for another user".into()));
+    }
     let db = state.db.lock().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     for otpk in &keys {
         db.execute(
             "INSERT OR IGNORE INTO one_time_prekeys (user_id, key_id, public_key) VALUES (?1,?2,?3)",
-            params![user_id, otpk.key_id, otpk.public_key],
+            params![claims.sub, otpk.key_id, otpk.public_key],
         )
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     }

@@ -45,6 +45,19 @@ fn migrate(conn: &Connection) -> Result<()> {
             delivered       INTEGER NOT NULL DEFAULT 0
         );
         CREATE INDEX IF NOT EXISTS idx_msg_recipient ON messages(recipient_id, delivered, timestamp);
+
+        -- Google OAuth: maps google_sub → user_id (set after first OAuth login)
+        CREATE TABLE IF NOT EXISTS oauth_accounts (
+            google_sub  TEXT PRIMARY KEY,
+            user_id     TEXT NOT NULL REFERENCES devices(user_id),
+            email       TEXT NOT NULL
+        );
+
+        -- Short-lived CSRF state tokens for the OAuth flow
+        CREATE TABLE IF NOT EXISTS oauth_states (
+            state       TEXT PRIMARY KEY,
+            created_at  INTEGER NOT NULL
+        );
         ",
     )
 }
