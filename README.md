@@ -6,7 +6,7 @@
 
 End-to-end encrypted desktop chat — built with Tauri 2, Vue 3, and Rust.
 
-Messages are encrypted on your device before leaving it. The relay server forwards sealed envelopes and never has access to plaintext.
+Messages are encrypted on your device before leaving it. The relay server forwards sealed envelopes and never has access to plaintext. Identity is verified via Google OAuth; sessions are authenticated with JWTs.
 
 ---
 
@@ -17,14 +17,14 @@ Messages are encrypted on your device before leaving it. The relay server forwar
 │   engage (this repo)     │        │   engage-server            │
 │                          │        │                            │
 │  Vue 3 frontend          │  WSS   │  Axum relay server         │
-│  ├─ Pinia stores         │◄──────►│  ├─ Key distribution API   │
-│  ├─ Vue Router           │  HTTPS │  ├─ Sealed message relay    │
-│  └─ Tauri IPC bridge     │        │  └─ WebSocket push         │
-│                          │        │                            │
-│  Rust backend (Tauri)    │        │  SQLite (server-side)      │
-│  ├─ X3DH key agreement   │        │  (stores only ciphertext)  │
-│  ├─ Double Ratchet       │        └────────────────────────────┘
-│  └─ SQLite (local)       │
+│  ├─ Pinia stores         │◄──────►│  ├─ Google OAuth + JWT     │
+│  ├─ Vue Router           │  HTTPS │  ├─ Key distribution API   │
+│  └─ Tauri IPC bridge     │        │  ├─ Sealed message relay   │
+│                          │        │  └─ WebSocket push         │
+│  Rust backend (Tauri)    │        │                            │
+│  ├─ X3DH key agreement   │        │  SQLite (server-side)      │
+│  ├─ Double Ratchet       │        │  (stores only ciphertext)  │
+│  └─ SQLite (local)       │        └────────────────────────────┘
 └──────────────────────────┘
 ```
 
@@ -36,6 +36,7 @@ Messages are encrypted on your device before leaving it. The relay server forwar
 | Ed25519 | Signed prekey signatures | `ed25519-dalek` |
 | AES-256-GCM | Message encryption | `aes-gcm` |
 | HKDF-SHA256 | Key derivation (X3DH output + ratchet KDF) | `hkdf` / `sha2` |
+| HS256 JWT | Session authentication | `jsonwebtoken` |
 
 The full [X3DH](https://signal.org/docs/specifications/x3dh/) + [Double Ratchet](https://signal.org/docs/specifications/doubleratchet/) protocol is implemented in pure Rust in `src-tauri/src/crypto/`.
 
@@ -47,17 +48,19 @@ The full [X3DH](https://signal.org/docs/specifications/x3dh/) + [Double Ratchet]
 engage/
 ├── src/                        # Vue 3 frontend
 │   ├── config.ts               # Server URL config (VITE_SERVER_URL)
-│   ├── router/index.ts         # Vue Router (hash history)
+│   ├── router/index.ts         # Vue Router — auth + identity guards
 │   ├── stores/
+│   │   ├── auth.ts             # JWT storage, Google OAuth login, deep-link listener
 │   │   ├── identity.ts         # Key generation, registration, WS connect
 │   │   ├── contacts.ts         # Contact list + X3DH session setup
 │   │   └── messages.ts         # Send (encrypt → relay) / receive (decrypt)
 │   ├── composables/
-│   │   ├── useWebSocket.ts     # WS singleton with auto-reconnect + decrypt
-│   │   ├── useServerApi.ts     # Typed fetch wrapper for the relay server
+│   │   ├── useWebSocket.ts     # WS singleton with JWT auth + auto-reconnect
+│   │   ├── useServerApi.ts     # Typed fetch wrapper — attaches Bearer token
 │   │   └── useCrypto.ts        # Thin wrappers over Tauri crypto commands
 │   ├── views/
-│   │   ├── SetupView.vue       # First-run identity creation
+│   │   ├── LoginView.vue       # Google sign-in screen
+│   │   ├── SetupView.vue       # First-run identity / display name setup
 │   │   ├── ChatView.vue        # Main two-panel chat layout
 │   │   └── SettingsView.vue    # Identity key display
 │   └── components/
@@ -80,7 +83,7 @@ engage/
     │   │                       # encrypt_message, decrypt_message,
     │   │                       # generate_prekey_bundle
     │   └── storage/db.rs       # SQLite schema + migrations (WAL mode)
-    └── tauri.conf.json
+    └── tauri.conf.json         # deep-link scheme: engage://
 ```
 
 ---
@@ -93,7 +96,7 @@ engage/
 | Node.js | ≥ 18 | v19 also works (engine warnings are non-fatal) |
 | npm | ≥ 8 | Bundled with Node |
 | C linker | — | **Windows:** MinGW GCC via Scoop (`scoop install gcc`) or MSVC Build Tools. **macOS/Linux:** Xcode CLT / `build-essential` |
-| engage-server | running | See [engage-server](https://github.com/faridguzman91/rust-engage/tree/engage-server) |
+| engage-server | running | See [engage-server](https://github.com/faridguzman91/rust-engage/tree/engage-server) — requires Google OAuth credentials |
 
 ### Windows-specific toolchain note
 
@@ -119,39 +122,50 @@ git clone git@github.com:faridguzman91/rust-engage.git
 cd rust-engage
 ```
 
-### 2. Start the relay server
+### 2. Set up Google OAuth credentials
 
-The client needs the server running before first launch. See the [server README](https://github.com/faridguzman91/rust-engage/tree/engage-server) or run:
+1. Go to [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials**
+2. Create an **OAuth 2.0 Client ID** — application type: **Web application**
+3. Add `http://localhost:3000/api/auth/google/callback` to **Authorized redirect URIs**
+4. Copy the client ID and secret into the server's `.env` file (see step 3)
+
+### 3. Configure and start the relay server
 
 ```bash
-# In a separate terminal — requires Rust toolchain
+# In a separate terminal
 git clone --branch engage-server git@github.com:faridguzman91/rust-engage.git engage-server
 cd engage-server
+cp .env.example .env
+# Fill in GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and JWT_SECRET in .env
 cargo run
 # Server listens on http://localhost:3000
 ```
 
-### 3. Install frontend dependencies
+### 4. Install frontend dependencies
 
 ```bash
 npm install
 ```
 
-### 4. Run in development mode
+### 5. Run in development mode
 
 ```bash
 npm run tauri dev
 ```
 
-Tauri will start the Vite dev server on `http://localhost:1420` and open the native app window.
+Tauri starts the Vite dev server on `http://localhost:1420` and opens the native app window.
 
-### 5. First run
+### 6. First run — user flow
 
-On first launch you will be taken to the **Setup** screen. Enter a display name — the app will:
-
-1. Generate your Ed25519 identity key pair and X25519 signed prekey locally
-2. Register your public keys with the relay server (`POST /api/register`)
-3. Open a WebSocket connection for real-time message delivery
+```
+Launch app
+  └─► /login  →  "Continue with Google"
+        └─► System browser opens → Google consent
+              └─► Server issues JWT → redirects to engage://auth?token=…
+                    └─► Tauri catches deep-link → token stored
+                          └─► /setup  →  Enter display name → keys generated + registered
+                                └─► /chat  →  Ready to message
+```
 
 ---
 
@@ -169,12 +183,34 @@ The WebSocket URL is derived automatically (`http://` → `ws://`, `https://` �
 
 ### Server
 
-The relay server reads these environment variables at startup:
+See [engage-server/.env.example](https://github.com/faridguzman91/rust-engage/blob/engage-server/.env.example) for all variables. Required ones:
 
-| Variable | Default | Description |
-|---|---|---|
-| `PORT` | `3000` | TCP port to listen on |
-| `DATABASE_PATH` | `engage-server.db` | Path to the SQLite database file |
+| Variable | Description |
+|---|---|
+| `GOOGLE_CLIENT_ID` | From Google Cloud Console |
+| `GOOGLE_CLIENT_SECRET` | From Google Cloud Console |
+| `JWT_SECRET` | Long random string — `openssl rand -hex 32` |
+
+---
+
+## Authentication flow
+
+```
+Client (Tauri)                  Server                    Google
+──────────────                  ──────                    ──────
+1. open browser ──────────────► GET /api/auth/google ──► OAuth consent
+                                                     ◄── auth code
+                                POST token exchange  ──► Google
+                                                     ◄── id_token + email
+                                issue JWT (HS256)
+                                redirect ◄────────────── engage://auth?token=JWT
+2. deep-link caught
+3. JWT stored in localStorage
+4. All API calls include:
+   Authorization: Bearer JWT
+5. WS connects with:
+   /ws/:userId?token=JWT
+```
 
 ---
 
@@ -190,14 +226,14 @@ Alice (sender)                    Server                    Bob (receiver)
 3. init Double Ratchet
 4. encrypt("hello")
 5. POST /api/messages ──────────► store ciphertext ──────► push via WebSocket
-                                  (never decrypts)
+   { ciphertext, EK_A, JWT }      (never decrypts)
                                                             6. receive WS envelope
                                                             7. X3DH receive (EK_A)
                                                             8. init Double Ratchet
                                                             9. decrypt → "hello"
 ```
 
-After the first message, both sides advance the Double Ratchet independently — each message uses a fresh key derived from the ratchet chain, providing **forward secrecy** and **break-in recovery**.
+After the first message, both sides advance the Double Ratchet independently — each message uses a fresh key, providing **forward secrecy** and **break-in recovery**.
 
 ---
 
@@ -208,6 +244,8 @@ npm run tauri build
 ```
 
 Binaries are written to `src-tauri/target/release/bundle/`.
+
+> For production deployments, point `VITE_SERVER_URL` at your hosted server over HTTPS. The server must run behind a TLS-terminating reverse proxy (nginx, Caddy) so that both the API and WebSocket connections are encrypted in transit.
 
 ---
 
@@ -221,6 +259,7 @@ Binaries are written to `src-tauri/target/release/bundle/`.
 | Routing | [Vue Router 4](https://router.vuejs.org) |
 | Build tool | [Vite](https://vitejs.dev) |
 | Crypto (client) | x25519-dalek, ed25519-dalek, aes-gcm, hkdf |
+| Auth | Google OAuth 2.0 + HS256 JWT |
 | Local storage | SQLite via [rusqlite](https://github.com/rusqlite/rusqlite) (bundled) |
 | Relay server | [Axum](https://github.com/tokio-rs/axum) + Tokio |
 
@@ -228,9 +267,12 @@ Binaries are written to `src-tauri/target/release/bundle/`.
 
 ## Roadmap
 
-- [ ] Authentication (token-based — currently identity key is used directly as user ID)
-- [ ] One-time prekey replenishment (auto-upload when pool runs low)
-- [ ] Group messaging
-- [ ] Voice/video via WebRTC + TURN
-- [ ] Mobile (Tauri Android/iOS target)
-- [ ] Disappearing messages
+- [x] **E2E encryption** — X3DH key agreement + Double Ratchet (forward secrecy, break-in recovery)
+- [x] **Authentication** — Google OAuth 2.0 + HS256 JWT; all API routes and WebSocket connections are protected
+- [x] **Relay server** — zero-knowledge Axum server; stores and forwards sealed envelopes only
+- [x] **Offline message drain** — messages queued server-side while recipient is offline, delivered on reconnect
+- [ ] **OPK replenishment** — auto-upload fresh one-time prekeys when the server pool runs low
+- [ ] **Disappearing messages** — per-conversation TTL; messages auto-delete on both sides after a set time
+- [ ] **Group messaging** — multi-party encrypted chat using Sender Keys (Signal-style)
+- [ ] **Voice / video** — WebRTC peer connections + TURN server for NAT traversal
+- [ ] **Mobile** — Tauri Android / iOS build target
