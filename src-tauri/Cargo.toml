@@ -1,0 +1,37 @@
+[package]
+name = "engage"
+version = "0.1.0"
+description = "Engage — end-to-end encrypted chat"
+authors = []
+edition = "2021"
+
+[lib]
+name = "engage_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Crypto
+rand = "0.8"
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+aes-gcm = "0.10"
+sha2 = "0.10"
+hkdf = "0.12"
+base64 = "0.22"
+
+# Storage
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+# Utilities
+uuid = { version = "1", features = ["v4"] }
+
+# Async
+tokio = { version = "1", features = ["full"] }
