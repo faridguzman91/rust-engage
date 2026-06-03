@@ -8,6 +8,11 @@
 //
 // Receive pipeline (incoming WS push or offline drain):
 //   useWebSocket.ts decrypts and calls append() which deduplicates by message ID.
+//
+// Disappearing messages:
+//   Messages with expiresAt set are scheduled for removal by useDisappearingMessages.
+//   remove() is called when the timer fires to purge from the store (DB deletion is
+//   handled by sweep_expired_messages on the Rust side).
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
@@ -23,6 +28,7 @@ export interface Message {
   timestamp: number;
   status: "sending" | "sent" | "delivered" | "read" | "failed";
   isMine: boolean;
+  expiresAt?: number | null;  // @faridguzman91: Unix-ms expiry, null/undefined = never
 }
 
 export const useMessagesStore = defineStore("messages", () => {
@@ -52,12 +58,11 @@ export const useMessagesStore = defineStore("messages", () => {
     await api.sendEnvelope({
       recipientId: conversationId,
       senderIk: identity.keys?.identityPublicKey ?? "",
-      // @faridguzman91: ephemeralKey is only non-null on the first message (X3DH initiator envelope)
       ephemeralKey: ephemeralKey ?? undefined,
       ciphertext: encrypted.ciphertext,
     });
 
-    // 4. Persist locally (Rust stores the encrypted body; UI gets plaintext back)
+    // 4. Persist locally and return to UI (Rust sets expires_at if timer is active)
     const msg = await invoke<Message>("send_message", { conversationId, body });
 
     if (!byConversation.value[conversationId]) {
@@ -79,9 +84,19 @@ export const useMessagesStore = defineStore("messages", () => {
     }
   }
 
+  // @faridguzman91: Remove a single message from the in-memory store.
+  // Called by useDisappearingMessages when a timer fires.
+  // DB deletion is handled separately by sweep_expired_messages.
+  function remove(messageId: string, conversationId: string) {
+    const msgs = byConversation.value[conversationId];
+    if (msgs) {
+      byConversation.value[conversationId] = msgs.filter((m) => m.id !== messageId);
+    }
+  }
+
   function forConversation(id: string): Message[] {
     return byConversation.value[id] ?? [];
   }
 
-  return { byConversation, load, send, append, forConversation };
+  return { byConversation, load, send, append, remove, forConversation };
 });

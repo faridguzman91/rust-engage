@@ -11,6 +11,7 @@ import { useMessagesStore } from "../stores/messages";
 import type { Message } from "../stores/messages";
 import { SERVER_WS } from "../config";
 import { useOpkReplenishment } from "./useOpkReplenishment";
+import { useDisappearingMessages } from "./useDisappearingMessages";
 
 function getToken(): string {
   return localStorage.getItem("engage_jwt") ?? "";
@@ -103,6 +104,16 @@ export function useWebSocket() {
           isMine: false,
         };
         messagesStore.append(msg);
+
+        // @faridguzman91: If the sender has set a disappear timer, set expiry
+        // on the inbound message and schedule its removal
+        if (msg.expiresAt) {
+          await invoke("set_message_expiry", {
+            messageId: msg.id,
+            expiresAt: msg.expiresAt,
+          }).catch(() => {});
+          useDisappearingMessages().scheduleExpiry(msg);
+        }
 
         // ACK delivery back to server
         send({ type: "ack", messageId: raw.id });

@@ -17,7 +17,6 @@ fn migrate(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "
         -- @faridguzman91: Local identity — exactly one row (id=1).
-        -- private_key and spk_private are stored as BLOBs (raw bytes, never base64 at rest).
         CREATE TABLE IF NOT EXISTS identity (
             id          INTEGER PRIMARY KEY,
             display_name TEXT NOT NULL,
@@ -35,8 +34,6 @@ fn migrate(conn: &Connection) -> Result<()> {
             last_seen   INTEGER
         );
 
-        -- @faridguzman91: Messages store the encrypted body for outbound messages
-        -- (so the UI can show sent status) and plaintext for inbound (after decrypt).
         CREATE TABLE IF NOT EXISTS messages (
             id              TEXT PRIMARY KEY,
             conversation_id TEXT NOT NULL,
@@ -49,14 +46,12 @@ fn migrate(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id, timestamp);
 
         -- @faridguzman91: sessions stores the serialised RatchetState JSON per contact.
-        -- Persisting this to SQLite means sessions survive app restarts.
         CREATE TABLE IF NOT EXISTS sessions (
             contact_id  TEXT PRIMARY KEY,
             state_json  TEXT NOT NULL
         );
 
-        -- @faridguzman91: Local OPK pool — private halves stored here,
-        -- public halves uploaded to the server. used=1 after server claims it.
+        -- @faridguzman91: Local OPK pool — private halves stored here, public halves uploaded.
         CREATE TABLE IF NOT EXISTS one_time_prekeys (
             key_id      INTEGER PRIMARY KEY,
             public_key  TEXT NOT NULL,
@@ -64,5 +59,35 @@ fn migrate(conn: &Connection) -> Result<()> {
             used        INTEGER NOT NULL DEFAULT 0
         );
         ",
-    )
+    )?;
+
+    // @faridguzman91: Additive column migrations — ALTER TABLE IF NOT EXISTS isn't in SQLite,
+    // so we inspect PRAGMA table_info and skip if the column is already present.
+    // disappear_after_secs: per-conversation TTL in seconds (0 = disabled)
+    // expires_at: Unix-ms timestamp when a message should be deleted (NULL = never)
+    add_column_if_missing(conn, "contacts", "disappear_after_secs", "INTEGER NOT NULL DEFAULT 0")?;
+    add_column_if_missing(conn, "messages",  "expires_at",           "INTEGER")?;
+
+    Ok(())
+}
+
+/// @faridguzman91: Add a column to a table only if it doesn't already exist.
+/// SQLite does not support IF NOT EXISTS on ALTER TABLE.
+fn add_column_if_missing(
+    conn: &Connection,
+    table: &str,
+    column: &str,
+    definition: &str,
+) -> Result<()> {
+    let exists: bool = conn
+        .prepare(&format!("PRAGMA table_info({table})"))?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .any(|name| name.map(|n| n == column).unwrap_or(false));
+
+    if !exists {
+        conn.execute_batch(&format!(
+            "ALTER TABLE {table} ADD COLUMN {column} {definition};"
+        ))?;
+    }
+    Ok(())
 }

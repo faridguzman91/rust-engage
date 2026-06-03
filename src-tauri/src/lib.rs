@@ -51,6 +51,10 @@ pub fn run() {
             commands::crypto::init_inbound_session,
             commands::prekeys::get_opk_status,
             commands::prekeys::generate_and_store_opks,
+            commands::disappear::get_disappear_timer,
+            commands::disappear::set_disappear_timer,
+            commands::disappear::set_message_expiry,
+            commands::disappear::sweep_expired_messages,
         ])
         .run(tauri::generate_context!())
         .expect("error while running engage");

@@ -1,3 +1,6 @@
+// @faridguzman91: Tauri commands for local message persistence.
+// send_message respects the conversation's disappear timer — if disappear_after_secs > 0
+// the row is inserted with expires_at = now + ttl so sweep_expired_messages removes it later.
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -19,6 +22,8 @@ pub struct Message {
     pub status: String,
     #[serde(rename = "isMine")]
     pub is_mine: bool,
+    #[serde(rename = "expiresAt")]
+    pub expires_at: Option<i64>,
 }
 
 fn now_ms() -> i64 {
@@ -36,12 +41,19 @@ pub fn list_messages(
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let mut stmt = db
         .prepare(
-            "SELECT id, conversation_id, sender_id, body, timestamp, status, is_mine
-             FROM messages WHERE conversation_id=?1 ORDER BY timestamp",
+            // @faridguzman91: Exclude already-expired messages on load so stale rows
+            // don't appear if sweep hasn't run yet this session.
+            "SELECT id, conversation_id, sender_id, body, timestamp, status, is_mine, expires_at
+             FROM messages
+             WHERE conversation_id=?1
+               AND (expires_at IS NULL OR expires_at > ?2)
+             ORDER BY timestamp",
         )
         .map_err(|e| e.to_string())?;
+
+    let now = now_ms();
     let msgs = stmt
-        .query_map(params![conversation_id], |row| {
+        .query_map(params![conversation_id, now], |row| {
             Ok(Message {
                 id: row.get(0)?,
                 conversation_id: row.get(1)?,
@@ -50,6 +62,7 @@ pub fn list_messages(
                 timestamp: row.get(4)?,
                 status: row.get(5)?,
                 is_mine: row.get::<_, i32>(6)? != 0,
+                expires_at: row.get(7)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -69,12 +82,27 @@ pub fn send_message(
 
     let db = state.db.lock().map_err(|e| e.to_string())?;
 
-    // Encrypt with the ratchet session if one exists; otherwise store plaintext (pre-session state).
+    // @faridguzman91: Check if this conversation has a disappear timer active
+    let disappear_secs: u64 = db
+        .query_row(
+            "SELECT disappear_after_secs FROM contacts WHERE id=?1",
+            params![conversation_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    let expires_at: Option<i64> = if disappear_secs > 0 {
+        Some(ts + (disappear_secs as i64 * 1000))
+    } else {
+        None
+    };
+
+    // Encrypt with the ratchet session if one exists; otherwise store plaintext.
     let stored_body = {
         let manager = SessionManager::new(&db);
         match manager.encrypt(&conversation_id, body.as_bytes()) {
-            Ok(ciphertext_json) => ciphertext_json,
-            Err(_) => body.clone(), // no session yet — store plaintext until session is established
+            Ok(ct) => ct,
+            Err(_) => body.clone(),
         }
     };
 
@@ -82,16 +110,18 @@ pub fn send_message(
         id: id.clone(),
         conversation_id: conversation_id.clone(),
         sender_id: "me".into(),
-        body: body.clone(), // return plaintext to UI
+        body: body.clone(),
         timestamp: ts,
         status: "sent".into(),
         is_mine: true,
+        expires_at,
     };
 
     db.execute(
-        "INSERT INTO messages (id, conversation_id, sender_id, body, timestamp, status, is_mine)
-         VALUES (?1,?2,?3,?4,?5,?6,?7)",
-        params![id, conversation_id, "me", stored_body, ts, "sent", 1],
+        "INSERT INTO messages
+         (id, conversation_id, sender_id, body, timestamp, status, is_mine, expires_at)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
+        params![id, conversation_id, "me", stored_body, ts, "sent", 1, expires_at],
     )
     .map_err(|e| e.to_string())?;
 

@@ -1,31 +1,52 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, nextTick } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import { useMessagesStore } from "../stores/messages";
 import { useContactsStore } from "../stores/contacts";
+import { useDisappearingMessages, TIMER_OPTIONS, formatTimer } from "../composables/useDisappearingMessages";
 import Avatar from "primevue/avatar";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Tag from "primevue/tag";
 import ProgressSpinner from "primevue/progressspinner";
+import Select from "primevue/select";
 
 const props = defineProps<{ contactId: string }>();
 
 const messages = useMessagesStore();
 const contacts = useContactsStore();
+const { scheduleExpiry, startSweep } = useDisappearingMessages();
 
 const input = ref("");
 const threadEl = ref<HTMLElement | null>(null);
 const sending = ref(false);
 const loading = ref(false);
+const timerSecs = ref(0);
+let sweepInterval: ReturnType<typeof setInterval> | null = null;
 
 const contact = computed(() => contacts.getById(props.contactId));
 const msgs = computed(() => messages.forConversation(props.contactId));
+
+// @faridguzman91: Format the expiry countdown for display on a bubble
+function formatCountdown(expiresAt: number): string {
+  const remaining = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+  if (remaining < 60)   return `${remaining}s`;
+  if (remaining < 3600) return `${Math.ceil(remaining / 60)}m`;
+  if (remaining < 86400)return `${Math.ceil(remaining / 3600)}h`;
+  return `${Math.ceil(remaining / 86400)}d`;
+}
 
 async function load() {
   loading.value = true;
   await messages.load(props.contactId);
   loading.value = false;
   scrollToBottom();
+
+  // Load the current timer setting for this conversation
+  timerSecs.value = await invoke<number>("get_disappear_timer", { contactId: props.contactId });
+
+  // Schedule JS timers for any message with a future expiry
+  await startSweep(msgs.value);
 }
 
 async function send() {
@@ -34,11 +55,17 @@ async function send() {
   input.value = "";
   sending.value = true;
   try {
-    await messages.send(props.contactId, body);
+    const msg = await messages.send(props.contactId, body);
+    scheduleExpiry(msg);
     scrollToBottom();
   } finally {
     sending.value = false;
   }
+}
+
+async function onTimerChange(secs: number) {
+  timerSecs.value = secs;
+  await invoke("set_disappear_timer", { contactId: props.contactId, secs });
 }
 
 function scrollToBottom() {
@@ -55,7 +82,18 @@ function avatarLabel(name?: string) {
   return name?.[0]?.toUpperCase() ?? "?";
 }
 
-onMounted(load);
+onMounted(() => {
+  load();
+  // @faridguzman91: Periodic sweep every 30s to clean up expired messages
+  sweepInterval = setInterval(async () => {
+    await invoke("sweep_expired_messages");
+  }, 30_000);
+});
+
+onUnmounted(() => {
+  if (sweepInterval) clearInterval(sweepInterval);
+});
+
 watch(() => props.contactId, load);
 </script>
 
@@ -76,10 +114,28 @@ watch(() => props.contactId, load);
         </div>
       </div>
       <div class="header-actions">
+        <!-- @faridguzman91: Disappear timer picker -->
+        <div class="timer-wrap" v-tooltip.bottom="'Disappearing messages'">
+          <i class="pi pi-clock timer-icon" :class="{ active: timerSecs > 0 }" />
+          <Select
+            :model-value="timerSecs"
+            :options="TIMER_OPTIONS"
+            option-label="label"
+            option-value="value"
+            class="timer-select"
+            @update:model-value="onTimerChange"
+          />
+        </div>
         <Button icon="pi pi-phone" text rounded size="small" v-tooltip.bottom="'Voice call (coming soon)'" disabled />
         <Button icon="pi pi-video" text rounded size="small" v-tooltip.bottom="'Video call (coming soon)'" disabled />
         <Button icon="pi pi-ellipsis-v" text rounded size="small" v-tooltip.bottom="'More options'" />
       </div>
+    </div>
+
+    <!-- Disappear timer banner -->
+    <div v-if="timerSecs > 0" class="timer-banner">
+      <i class="pi pi-clock" />
+      Messages disappear after <strong>{{ formatTimer(timerSecs) }}</strong>
     </div>
 
     <!-- Messages -->
@@ -117,6 +173,11 @@ watch(() => props.contactId, load);
                 :class="msg.status === 'read' ? 'pi-check-circle' : 'pi-check'"
                 style="font-size:0.65rem;"
               />
+              <!-- @faridguzman91: Expiry countdown shown on disappearing messages -->
+              <span v-if="msg.expiresAt" class="expiry-badge">
+                <i class="pi pi-clock" style="font-size:0.6rem;" />
+                {{ formatCountdown(msg.expiresAt) }}
+              </span>
             </span>
           </div>
         </div>
@@ -165,7 +226,40 @@ watch(() => props.contactId, load);
 }
 .header-left { display: flex; align-items: center; gap: 0.75rem; }
 .contact-name { font-weight: 600; font-size: 0.95rem; margin: 0 0 0.2rem; }
-.header-actions { display: flex; gap: 0.25rem; }
+.header-actions { display: flex; align-items: center; gap: 0.25rem; }
+
+/* @faridguzman91: Timer picker — clock icon + hidden select overlay */
+.timer-wrap {
+  display: flex;
+  align-items: center;
+  position: relative;
+  cursor: pointer;
+}
+.timer-icon {
+  font-size: 1rem;
+  color: var(--engage-muted);
+  transition: color 0.15s;
+}
+.timer-icon.active { color: var(--engage-accent); }
+.timer-select {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  cursor: pointer;
+}
+
+.timer-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 1.25rem;
+  background: rgba(62, 191, 140, 0.08);
+  border-bottom: 1px solid rgba(62, 191, 140, 0.2);
+  font-size: 0.78rem;
+  color: var(--engage-accent);
+  flex-shrink: 0;
+}
 
 .messages-area {
   flex: 1;
@@ -223,8 +317,15 @@ watch(() => props.contactId, load);
   align-self: flex-end;
   display: flex;
   align-items: center;
-  gap: 0.2rem;
+  gap: 0.25rem;
   white-space: nowrap;
+}
+.expiry-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  color: var(--engage-accent);
+  opacity: 1;
 }
 
 .composer {
