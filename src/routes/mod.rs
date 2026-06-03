@@ -1,3 +1,4 @@
+pub mod groups;
 pub mod keys;
 pub mod messages;
 pub mod oauth;

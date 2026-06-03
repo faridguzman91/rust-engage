@@ -76,7 +76,7 @@ pub async fn fetch_messages(
     let db = state.db.lock().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     let mut stmt = db
         .prepare(
-            "SELECT id, sender_id, sender_ik, ephemeral_key, otpk_id, ciphertext, timestamp
+            "SELECT id, sender_id, sender_ik, ephemeral_key, otpk_id, ciphertext, timestamp, group_id
              FROM messages WHERE recipient_id=?1 AND delivered=0 ORDER BY timestamp",
         )
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;

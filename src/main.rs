@@ -54,6 +54,13 @@ async fn main() {
         .route("/api/keys/{user_id}/prekeys/count", get(routes::keys::opk_count))
         .route("/api/messages", post(routes::messages::send_message))
         .route("/api/messages/{user_id}", get(routes::messages::fetch_messages))
+        // Group routes
+        .route("/api/groups", post(routes::groups::create_group))
+        .route("/api/groups", get(routes::groups::list_groups))
+        .route("/api/groups/{id}", get(routes::groups::get_group))
+        .route("/api/groups/{id}/members", post(routes::groups::add_member))
+        .route("/api/groups/{id}/members/{user_id}", axum::routing::delete(routes::groups::remove_member))
+        .route("/api/groups/{id}/messages", post(routes::groups::send_group_message))
         .route("/ws/{user_id}", get(routes::ws::ws_handler))
         .layer(middleware::from_fn_with_state(
             app_state.clone(),

@@ -58,6 +58,51 @@ fn migrate(conn: &Connection) -> Result<()> {
             state       TEXT PRIMARY KEY,
             created_at  INTEGER NOT NULL
         );
+
+        -- @faridguzman91: Group chat tables
+        CREATE TABLE IF NOT EXISTS groups (
+            id          TEXT PRIMARY KEY,
+            name        TEXT NOT NULL,
+            created_by  TEXT NOT NULL REFERENCES devices(user_id),
+            created_at  INTEGER NOT NULL
+        );
+
+        -- @faridguzman91: Group membership — one row per (group, member) pair.
+        -- identity_key is denormalised here so members can distribute Sender Keys
+        -- to each other without an extra prekey lookup.
+        CREATE TABLE IF NOT EXISTS group_members (
+            group_id     TEXT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+            user_id      TEXT NOT NULL,
+            display_name TEXT NOT NULL,
+            identity_key TEXT NOT NULL,
+            joined_at    INTEGER NOT NULL,
+            PRIMARY KEY (group_id, user_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_gm_user ON group_members(user_id);
         ",
-    )
+    )?;
+
+    // @faridguzman91: Additive migration — add group_id to messages so group fan-out
+    // rows can be distinguished from 1:1 messages on the client side.
+    add_column_if_missing(conn, "messages", "group_id", "TEXT")?;
+
+    Ok(())
+}
+
+fn add_column_if_missing(
+    conn: &rusqlite::Connection,
+    table: &str,
+    column: &str,
+    definition: &str,
+) -> Result<()> {
+    let exists: bool = conn
+        .prepare(&format!("PRAGMA table_info({table})"))?
+        .query_map([], |row| row.get::<_, String>(1))?
+        .any(|n| n.map(|n| n == column).unwrap_or(false));
+    if !exists {
+        conn.execute_batch(&format!(
+            "ALTER TABLE {table} ADD COLUMN {column} {definition};"
+        ))?;
+    }
+    Ok(())
 }
