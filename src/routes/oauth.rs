@@ -9,12 +9,12 @@ use rand::Rng;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 
+use base64::Engine as _;
 use crate::auth::issue_jwt;
 use crate::state::AppState;
 
 const GOOGLE_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
-const GOOGLE_USERINFO_URL: &str = "https://www.googleapis.com/oauth2/v3/userinfo";
 const STATE_TTL_SECS: i64 = 300; // 5 minutes
 
 fn random_state() -> String {
@@ -64,6 +64,7 @@ pub struct CallbackParams {
 
 #[derive(Deserialize)]
 struct TokenResponse {
+    access_token: String,
     id_token: String,
 }
 
@@ -72,6 +73,22 @@ struct GoogleUser {
     sub: String,
     email: String,
     name: Option<String>,
+}
+
+/// Decode the payload of a Google id_token JWT without signature verification.
+/// We trust the token because we just received it from Google's token endpoint
+/// over TLS using our own client_secret — no need for a separate userinfo call.
+fn decode_id_token(id_token: &str) -> Result<GoogleUser, String> {
+    let payload = id_token
+        .split('.')
+        .nth(1)
+        .ok_or("malformed id_token: missing payload section")?;
+
+    let decoded = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(payload)
+        .map_err(|e| format!("base64 decode error: {e}"))?;
+
+    serde_json::from_slice(&decoded).map_err(|e| format!("JSON decode error: {e}"))
 }
 
 /// GET /api/auth/google/callback  — Google redirects here after consent
@@ -102,8 +119,7 @@ pub async fn callback(
     }
 
     // Exchange code for tokens
-    let client = reqwest::Client::new();
-    let token_res: TokenResponse = match client
+    let token_res: TokenResponse = match reqwest::Client::new()
         .post(GOOGLE_TOKEN_URL)
         .form(&[
             ("code", params.code.as_str()),
@@ -122,18 +138,12 @@ pub async fn callback(
         Err(e) => return (StatusCode::BAD_GATEWAY, e.to_string()).into_response(),
     };
 
-    // Decode the id_token (we trust Google's signature; use userinfo endpoint to validate)
-    let user: GoogleUser = match client
-        .get(GOOGLE_USERINFO_URL)
-        .bearer_auth(&token_res.id_token)
-        .send()
-        .await
-    {
-        Ok(r) => match r.json().await {
-            Ok(u) => u,
-            Err(e) => return (StatusCode::BAD_GATEWAY, e.to_string()).into_response(),
-        },
-        Err(e) => return (StatusCode::BAD_GATEWAY, e.to_string()).into_response(),
+    // Decode user info directly from the id_token JWT payload —
+    // no extra HTTP call needed; we trust the token because it came from
+    // Google's token endpoint using our client_secret over TLS.
+    let user: GoogleUser = match decode_id_token(&token_res.id_token) {
+        Ok(u) => u,
+        Err(e) => return (StatusCode::BAD_GATEWAY, format!("id_token decode failed: {e}")).into_response(),
     };
 
     // Look up or create user_id for this Google account
