@@ -8,6 +8,8 @@ End-to-end encrypted desktop chat — built with Tauri 2, Vue 3, and Rust.
 
 Messages are encrypted on your device before leaving it. The relay server forwards sealed envelopes and never has access to plaintext. Identity is verified via Google OAuth; sessions are authenticated with JWTs.
 
+> **Author:** [@faridguzman91](https://github.com/faridguzman91)
+
 ---
 
 ## Architecture
@@ -62,7 +64,8 @@ Dark mode is applied globally via PrimeVue's `darkModeSelector: ".dark"` — the
 
 | Screen | Route | PrimeVue components |
 |---|---|---|
-| **Login** | `/login` | `Card`, `Button` (Google icon slot), `Message` |
+| **Login** | `/login` | `Card`, `Button` (Google icon slot) |
+| **OAuth callback** | `/auth` | `ProgressSpinner` — extracts token from URL, navigates |
 | **Setup** | `/setup` | `Card`, `FloatLabel`, `InputText`, `Button`, `Message` |
 | **Chat** | `/chat/:id` | Layout shell — sidebar + thread pane |
 | **Settings** | `/settings` | `Panel` (collapsible keys), `Avatar`, `Tag`, `Button`, `Divider` |
@@ -82,8 +85,7 @@ Dark mode is applied globally via PrimeVue's `darkModeSelector: ".dark"` — the
 - Received messages show the contact's `Avatar` to the left
 - Each bubble shows timestamp + `pi-check` / `pi-check-circle` delivery indicator
 - `ProgressSpinner` while loading conversation history
-- Empty thread state with lock icon prompt
-- Composer bar: attach `pi-paperclip` (disabled), `InputText` with rounded pill style, emoji `pi-face-smile` (disabled), send `Button` with accent background
+- Composer bar: attach `pi-paperclip` (disabled), rounded pill `InputText`, emoji `pi-face-smile` (disabled), send `Button`
 
 ### Icons
 All icons use **[PrimeIcons](https://primevue.org/icons/)** (`primeicons` npm package). Key icons used:
@@ -92,7 +94,7 @@ All icons use **[PrimeIcons](https://primevue.org/icons/)** (`primeicons` npm pa
 
 ### Customising the theme
 
-PrimeVue design tokens are overridden in `src/styles/global.css` under the `.dark` selector. To change the accent colour:
+PrimeVue design tokens are overridden in `src/styles/global.css` under the `.dark` selector:
 
 ```css
 .dark {
@@ -117,7 +119,7 @@ engage/
 │   ├── router/index.ts             # Auth + identity route guards
 │   │
 │   ├── stores/
-│   │   ├── auth.ts                 # JWT, Google OAuth, deep-link handler
+│   │   ├── auth.ts                 # JWT storage, Google OAuth (webview navigation)
 │   │   ├── identity.ts             # Key generation, server registration, WS connect
 │   │   ├── contacts.ts             # Contact CRUD + X3DH session init
 │   │   └── messages.ts             # Send (encrypt → relay) / receive (decrypt)
@@ -130,6 +132,7 @@ engage/
 │   │
 │   ├── views/
 │   │   ├── LoginView.vue           # Google sign-in card
+│   │   ├── AuthCallbackView.vue    # OAuth callback — extracts ?token= from URL
 │   │   ├── SetupView.vue           # Display name + key generation
 │   │   ├── ChatView.vue            # Two-panel shell
 │   │   └── SettingsView.vue        # Profile, keys, sign out
@@ -141,9 +144,9 @@ engage/
 └── src-tauri/
     ├── src/
     │   ├── crypto/
-    │   │   ├── x3dh.rs             # X3DH key agreement
+    │   │   ├── x3dh.rs             # X3DH key agreement (initiator + recipient)
     │   │   ├── ratchet.rs          # Double Ratchet (encrypt/decrypt, skipped keys)
-    │   │   ├── session.rs          # Session manager — persists to SQLite
+    │   │   ├── session.rs          # Session manager — X3DH→Ratchet, persists to SQLite
     │   │   ├── identity.rs         # Identity bundle generation
     │   │   └── keys.rs             # X25519 / Ed25519 helpers
     │   ├── commands/
@@ -154,7 +157,7 @@ engage/
     │   │   │                       # encrypt/decrypt_message, generate_prekey_bundle
     │   │   └── prekeys.rs          # get_opk_status, generate_and_store_opks
     │   └── storage/db.rs           # SQLite schema + WAL migrations
-    └── tauri.conf.json             # deep-link scheme: engage://
+    └── tauri.conf.json             # engage:// deep-link scheme (production)
 ```
 
 ---
@@ -165,30 +168,27 @@ engage/
 |---|---|---|
 | Rust | ≥ 1.96 | Install via [rustup](https://rustup.rs) |
 | Node.js | ≥ 18 | v19 also works (engine warnings are non-fatal) |
-| **pnpm** | **≥ 7** | **`scoop install pnpm` or `npm i -g pnpm`** — npm is not used |
+| **pnpm** | **≥ 7** | **`scoop install pnpm`** — npm is not used |
 | C linker | — | **Windows:** see toolchain note below. **macOS/Linux:** Xcode CLT / `build-essential` |
 | engage-server | running | See [engage-server](https://github.com/faridguzman91/rust-engage/tree/engage-server) — requires Google OAuth credentials |
 
 ### Windows-specific toolchain note
 
-This project targets `x86_64-pc-windows-gnu`. Full Visual Studio Build Tools are **not** required. Instead:
+This project targets `x86_64-pc-windows-gnu`. Full Visual Studio Build Tools are **not** required:
 
-1. **GCC 14** (linker driver) + **LLD** (linker via `rust-lld`) are used.
-2. `rust-lld` is bundled with the Rust toolchain — no separate install.
-3. GCC 14 is needed to provide `libgcc`, `libmingwex`, etc.
+1. **GCC 14** is the linker driver — provides `libgcc`, `libmingwex`, etc.
+2. **`rust-lld`** (bundled with Rust) is the actual linker — no PE ordinal limit.
+3. `cdylib` is excluded from the crate type on desktop to avoid the 65535-export PE limit.
 
 ```powershell
-# Install GCC 14 via Scoop
-scoop install mingw        # GCC 14.2.0
-
-# Install the GNU Rust toolchain
+scoop install mingw          # GCC 14.2.0
 rustup toolchain install stable-x86_64-pc-windows-gnu
 rustup override set stable-x86_64-pc-windows-gnu   # run inside src-tauri/
 ```
 
-The `.cargo/config.toml` at the repo root sets the linker to GCC 14 with `-fuse-ld=lld` automatically — no manual config needed after the above steps.
+The `.cargo/config.toml` at the repo root applies `-fuse-ld=lld` automatically.
 
-> **Why not MSVC?** The MSVC Build Tools installer requires ~8 GB. GNU + LLD is a lighter alternative that works on Windows without a full Visual Studio installation.
+> **Why not MSVC?** The MSVC Build Tools installer requires ~8 GB. GNU + LLD is a lighter alternative that works without a full Visual Studio installation.
 
 ---
 
@@ -206,7 +206,7 @@ cd rust-engage
 1. Go to [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials**
 2. Create an **OAuth 2.0 Client ID** — application type: **Web application**
 3. Add `http://localhost:3000/api/auth/google/callback` to **Authorized redirect URIs**
-4. Copy the client ID and secret into the server's `.env` file (see step 3)
+4. Copy the client ID and secret into the server's `.env` file (step 3)
 
 ### 3. Configure and start the relay server
 
@@ -214,7 +214,7 @@ cd rust-engage
 git clone --branch engage-server git@github.com:faridguzman91/rust-engage.git engage-server
 cd engage-server
 cp .env.example .env
-# Fill in GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and JWT_SECRET
+# Fill in GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, JWT_SECRET, and FRONTEND_URL
 cargo run
 # Listens on http://localhost:3000
 ```
@@ -238,12 +238,15 @@ Tauri starts the Vite dev server on `http://localhost:1420` and opens the native
 ```
 Launch app
   └─► /login  →  "Continue with Google"
-        └─► System browser opens → Google consent
-              └─► Server issues JWT → redirects to engage://auth?token=…
-                    └─► Tauri catches deep-link → token stored
-                          └─► /setup  →  Enter display name → keys generated + registered
-                                └─► /chat  →  Ready to message
+        └─► Tauri webview navigates to localhost:3000/api/auth/google
+              └─► Google consent screen (inside the webview)
+                    └─► Server issues JWT → redirects to localhost:1420/#/auth?token=JWT
+                          └─► AuthCallbackView stores token → navigates to /setup
+                                └─► Enter display name → keys generated + registered
+                                      └─► /chat → Ready to message
 ```
+
+> **Dev vs. production:** In dev, the server redirects to `http://localhost:1420/#/auth` (set `FRONTEND_URL=http://localhost:1420` in `engage-server/.env`). In production, remove `FRONTEND_URL` and the server uses the `engage://` deep-link scheme instead.
 
 ---
 
@@ -265,6 +268,7 @@ The WebSocket URL is derived automatically (`http://` → `ws://`, `https://` �
 | `GOOGLE_CLIENT_ID` | From Google Cloud Console |
 | `GOOGLE_CLIENT_SECRET` | From Google Cloud Console |
 | `JWT_SECRET` | Long random string — `openssl rand -hex 32` |
+| `FRONTEND_URL` | **Dev only** — set to `http://localhost:1420` to redirect OAuth back into Vite instead of the deep-link |
 
 Full reference: [engage-server/.env.example](https://github.com/faridguzman91/rust-engage/blob/engage-server/.env.example)
 
@@ -273,15 +277,16 @@ Full reference: [engage-server/.env.example](https://github.com/faridguzman91/ru
 ## Authentication flow
 
 ```
-Client (Tauri)                  Server                    Google
-──────────────                  ──────                    ──────
-1. open browser ──────────────► GET /api/auth/google ──► OAuth consent
+Tauri webview                   Server                    Google
+─────────────                   ──────                    ──────
+1. window.location.href ──────► GET /api/auth/google ──► OAuth consent
                                                      ◄── auth code
                                 POST token exchange  ──► Google
-                                                     ◄── id_token + email
-                                issue JWT (HS256)
-                                redirect ◄────────────── engage://auth?token=JWT
-2. deep-link caught
+                                                     ◄── id_token (JWT payload decoded locally)
+                                issue app JWT (HS256)
+   Dev:  redirect to ◄────────── localhost:1420/#/auth?token=JWT
+   Prod: redirect to ◄────────── engage://auth?token=JWT
+2. AuthCallbackView / deep-link
 3. JWT stored in localStorage
 4. All API calls include:
    Authorization: Bearer JWT
@@ -321,7 +326,7 @@ pnpm tauri build
 
 Binaries are written to `src-tauri/target/release/bundle/`.
 
-> For production, point `VITE_SERVER_URL` at your server over HTTPS and run the server behind a TLS-terminating proxy (nginx, Caddy) so both HTTP and WebSocket traffic is encrypted in transit.
+> For production, point `VITE_SERVER_URL` at your server over HTTPS, run the server behind a TLS-terminating proxy (nginx, Caddy), and remove `FRONTEND_URL` from the server `.env` so the OAuth callback uses the `engage://` deep-link.
 
 ---
 
@@ -334,6 +339,7 @@ Binaries are written to `src-tauri/target/release/bundle/`.
 | **UI component library** | **[PrimeVue 4](https://primevue.org) — Aura preset + PrimeIcons** |
 | State management | [Pinia](https://pinia.vuejs.org) |
 | Routing | [Vue Router 4](https://router.vuejs.org) |
+| Package manager | [pnpm](https://pnpm.io) |
 | Build tool | [Vite](https://vitejs.dev) |
 | Crypto (client) | x25519-dalek, ed25519-dalek, aes-gcm, hkdf |
 | Auth | Google OAuth 2.0 + HS256 JWT |

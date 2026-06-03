@@ -1,8 +1,13 @@
+// @faridguzman91: SQLite database setup with WAL mode and auto-migration.
+// All tables use CREATE TABLE IF NOT EXISTS so migrations are additive and
+// safe to run on every startup without wiping existing data.
 use rusqlite::{Connection, Result};
 use std::path::Path;
 
 pub fn open(path: &Path) -> Result<Connection> {
     let conn = Connection::open(path)?;
+    // @faridguzman91: WAL mode gives better concurrent read performance and
+    // foreign key enforcement catches referential integrity bugs at the DB layer.
     conn.execute_batch("PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;")?;
     migrate(&conn)?;
     Ok(conn)
@@ -11,6 +16,8 @@ pub fn open(path: &Path) -> Result<Connection> {
 fn migrate(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "
+        -- @faridguzman91: Local identity — exactly one row (id=1).
+        -- private_key and spk_private are stored as BLOBs (raw bytes, never base64 at rest).
         CREATE TABLE IF NOT EXISTS identity (
             id          INTEGER PRIMARY KEY,
             display_name TEXT NOT NULL,
@@ -28,6 +35,8 @@ fn migrate(conn: &Connection) -> Result<()> {
             last_seen   INTEGER
         );
 
+        -- @faridguzman91: Messages store the encrypted body for outbound messages
+        -- (so the UI can show sent status) and plaintext for inbound (after decrypt).
         CREATE TABLE IF NOT EXISTS messages (
             id              TEXT PRIMARY KEY,
             conversation_id TEXT NOT NULL,
@@ -39,11 +48,15 @@ fn migrate(conn: &Connection) -> Result<()> {
         );
         CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id, timestamp);
 
+        -- @faridguzman91: sessions stores the serialised RatchetState JSON per contact.
+        -- Persisting this to SQLite means sessions survive app restarts.
         CREATE TABLE IF NOT EXISTS sessions (
             contact_id  TEXT PRIMARY KEY,
             state_json  TEXT NOT NULL
         );
 
+        -- @faridguzman91: Local OPK pool — private halves stored here,
+        -- public halves uploaded to the server. used=1 after server claims it.
         CREATE TABLE IF NOT EXISTS one_time_prekeys (
             key_id      INTEGER PRIMARY KEY,
             public_key  TEXT NOT NULL,

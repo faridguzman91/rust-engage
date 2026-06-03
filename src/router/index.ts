@@ -1,3 +1,5 @@
+// @faridguzman91: Vue Router with two-layer guards — auth (JWT present?) then identity (keys set up?).
+// Hash history is used so the Tauri webview and Vite dev server both handle routing consistently.
 import { createRouter, createWebHashHistory } from "vue-router";
 import { useIdentityStore } from "../stores/identity";
 import { useAuthStore } from "../stores/auth";
@@ -7,7 +9,8 @@ const router = createRouter({
   routes: [
     { path: "/", redirect: "/chat" },
     {
-      // OAuth callback: server redirects here with ?token=JWT in dev mode
+      // @faridguzman91: OAuth callback — server redirects here with ?token=JWT (dev mode).
+      // In production the engage:// deep-link is used instead.
       path: "/auth",
       component: () => import("../views/AuthCallbackView.vue"),
     },
@@ -39,6 +42,8 @@ const router = createRouter({
   ],
 });
 
+// @faridguzman91: Guard order matters — check auth before identity so unauthenticated
+// users never reach a route that would call invoke() and crash without Tauri context.
 router.beforeEach((to) => {
   const auth = useAuthStore();
   const identity = useIdentityStore();

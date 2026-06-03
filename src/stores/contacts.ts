@@ -1,3 +1,7 @@
+// @faridguzman91: Contacts store — CRUD for the contact list plus X3DH session management.
+// The first time a message is sent to a contact, ensureSession() fetches their prekey bundle
+// from the server, runs X3DH locally, and seeds the Double Ratchet. The ephemeral key
+// produced during X3DH is sent with the first message so the recipient can mirror the exchange.
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
@@ -13,7 +17,10 @@ export interface Contact {
 
 export const useContactsStore = defineStore("contacts", () => {
   const contacts = ref<Contact[]>([]);
-  // Contacts with an established ratchet session → their ephemeral key (set after X3DH)
+
+  // @faridguzman91: ephemeralKeys maps contactId → base64 EK_A produced during X3DH init.
+  // The key is included in the first message envelope so the recipient can complete X3DH.
+  // After it's consumed (sent once), the entry is set to "" to indicate "session exists but EK sent".
   const ephemeralKeys = ref<Record<string, string>>({});
 
   async function load() {
@@ -33,33 +40,32 @@ export const useContactsStore = defineStore("contacts", () => {
   }
 
   /**
-   * Ensure a ratchet session exists for this contact.
-   * Returns the ephemeral key string on first call (to be sent with the first message)
-   * so the recipient can complete X3DH and derive the same shared secret.
-   * Returns null on subsequent calls.
+   * @faridguzman91: Ensure a Double Ratchet session exists for this contact.
+   *
+   * First call  → fetches remote prekey bundle, runs X3DH, seeds the ratchet.
+   *               Returns the EK_A (ephemeral key) to include in the first message.
+   * Second call → session already exists, EK_A already sent. Returns null.
+   *
+   * Also triggers OPK replenishment after a session is initiated since one OPK
+   * was just consumed from the server pool.
    */
   async function ensureSession(contactId: string): Promise<string | null> {
     if (ephemeralKeys.value[contactId] !== undefined) {
-      // Already established — consume and clear the pending ephemeral key (only sent once)
       const ek = ephemeralKeys.value[contactId] || null;
       if (ek) {
-        ephemeralKeys.value[contactId] = ""; // mark as consumed
+        ephemeralKeys.value[contactId] = ""; // mark EK as consumed
         return ek;
       }
       return null;
     }
 
-    // First time: fetch remote bundle and do X3DH
+    // First time — fetch remote bundle and run X3DH on the Rust side
     const api = useServerApi();
     const bundle = await api.fetchPreKeyBundle(contactId);
-
-    // Rust performs X3DH → Double Ratchet init, returns the ephemeral key
     const ek = await invoke<string>("init_session", { contactId, bundle });
-
-    // Store the ephemeral key so the first send can include it
     ephemeralKeys.value[contactId] = ek;
 
-    // One OPK was just consumed from the server pool — check if we need to replenish
+    // @faridguzman91: One OPK was consumed — check if replenishment is needed
     useOpkReplenishment().checkAndReplenish();
 
     return ek;

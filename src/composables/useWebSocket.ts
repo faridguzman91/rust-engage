@@ -1,3 +1,10 @@
+// @faridguzman91: WebSocket singleton — one persistent connection per app session.
+// Handles:
+//   - JWT auth via ?token= query param (WebSocket handshakes can't send headers)
+//   - Incoming message decryption via Tauri invoke (X3DH inbound session init + Double Ratchet)
+//   - Exponential backoff reconnect (1s → 30s cap)
+//   - OPK replenishment check on every successful connect
+//   - ACK back to server after each delivered message
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useMessagesStore } from "../stores/messages";
@@ -11,7 +18,7 @@ function getToken(): string {
 
 type WSStatus = "disconnected" | "connecting" | "connected";
 
-// Module-level singleton so all components share one socket
+// @faridguzman91: Module-level singleton so all components share one socket instance
 let socket: WebSocket | null = null;
 let userId: string | null = null;
 let retryDelay = 1000;
@@ -38,7 +45,7 @@ export function useWebSocket() {
     socket.onopen = () => {
       status.value = "connected";
       retryDelay = 1000; // reset backoff on successful connect
-      // Check OPK pool every time we (re)connect — silent, non-blocking
+      // @faridguzman91: Check OPK pool silently on every (re)connect
       useOpkReplenishment().checkAndReplenish();
     };
 
@@ -60,7 +67,8 @@ export function useWebSocket() {
           timestamp: number;
         };
 
-        // If this is a first message (has ephemeralKey), establish inbound session first
+        // @faridguzman91: First message from this sender includes ephemeralKey (X3DH EK_A).
+        // We must init the inbound session before decrypting.
         if (raw.ephemeralKey) {
           try {
             await invoke("init_inbound_session", {
@@ -69,11 +77,11 @@ export function useWebSocket() {
               ephemeralKey: raw.ephemeralKey,
             });
           } catch {
-            // session already exists or failed — try to decrypt anyway
+            // session already exists or init failed — attempt decrypt anyway
           }
         }
 
-        // Decrypt the ratchet payload
+        // Decrypt via Double Ratchet
         let body: string;
         try {
           body = await invoke<string>("decrypt_message", {
@@ -96,13 +104,14 @@ export function useWebSocket() {
         };
         messagesStore.append(msg);
 
-        // ACK back to server
+        // ACK delivery back to server
         send({ type: "ack", messageId: raw.id });
       }
     };
 
     socket.onclose = () => {
       status.value = "disconnected";
+      // @faridguzman91: Exponential backoff — doubles each attempt, capped at 30s
       setTimeout(() => {
         retryDelay = Math.min(retryDelay * 2, MAX_DELAY);
         _connect();

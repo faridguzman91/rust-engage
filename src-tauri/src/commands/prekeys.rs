@@ -1,3 +1,9 @@
+// @faridguzman91: Tauri commands for one-time prekey (OPK) pool management.
+//
+// One-time prekeys give forward secrecy to the first message in an X3DH session:
+// each new session from a different sender consumes one OPK from the server pool.
+// When the pool drops below LOW_WATERMARK, the frontend calls generate_and_store_opks
+// to generate a fresh batch and upload the public halves to the server.
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use rusqlite::params;
 use serde::Serialize;
@@ -6,8 +12,10 @@ use tauri::State;
 use crate::crypto::keys::generate_one_time_prekeys;
 use crate::AppState;
 
-pub const LOW_WATERMARK: u32 = 10;  // replenish when server pool falls below this
-pub const BATCH_SIZE: usize = 100;  // number of OPKs to generate per replenishment
+// @faridguzman91: These constants are mirrored in useOpkReplenishment.ts —
+// keep them in sync if you change the thresholds.
+pub const LOW_WATERMARK: u32 = 10;
+pub const BATCH_SIZE: usize = 100;
 
 #[derive(Serialize)]
 pub struct OpkStatus {
@@ -17,8 +25,8 @@ pub struct OpkStatus {
     pub needs_replenishment: bool,
 }
 
-/// Returns how many unused OPKs the server currently has for us, plus a
-/// `needs_replenishment` flag the frontend uses to decide whether to upload.
+/// @faridguzman91: Stateless threshold check — accepts the server count from the
+/// frontend so the decision logic lives in one place (Rust) rather than duplicated.
 #[tauri::command]
 pub fn get_opk_status(server_remaining: u32) -> OpkStatus {
     OpkStatus {
@@ -29,9 +37,9 @@ pub fn get_opk_status(server_remaining: u32) -> OpkStatus {
 
 #[derive(Serialize)]
 pub struct GeneratedOpks {
-    /// Public halves — send these to the server.
+    /// Public halves — upload these to the server.
     pub public_keys: Vec<OpkPublic>,
-    /// How many keys were stored locally (private halves in SQLite).
+    /// How many keys were generated and stored locally.
     pub count: usize,
 }
 
@@ -43,13 +51,14 @@ pub struct OpkPublic {
     pub public_key: String,
 }
 
-/// Generate `BATCH_SIZE` fresh one-time prekeys, persist the private halves
-/// locally, and return the public halves for uploading to the server.
+/// @faridguzman91: Generate BATCH_SIZE fresh X25519 key pairs.
+/// Private halves are stored in local SQLite (never uploaded).
+/// Public halves are returned to the frontend for uploading to the server.
+/// Key IDs start from max(existing) + 1 to avoid collisions.
 #[tauri::command]
 pub fn generate_and_store_opks(state: State<AppState>) -> Result<GeneratedOpks, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
 
-    // Find the highest existing key_id so we never reuse IDs
     let max_id: u32 = db
         .query_row(
             "SELECT COALESCE(MAX(key_id), 0) FROM one_time_prekeys",
@@ -70,14 +79,8 @@ pub fn generate_and_store_opks(state: State<AppState>) -> Result<GeneratedOpks, 
         )
         .map_err(|e| e.to_string())?;
 
-        public_keys.push(OpkPublic {
-            key_id,
-            public_key: kp.public_key.clone(),
-        });
+        public_keys.push(OpkPublic { key_id, public_key: kp.public_key.clone() });
     }
 
-    Ok(GeneratedOpks {
-        count: public_keys.len(),
-        public_keys,
-    })
+    Ok(GeneratedOpks { count: public_keys.len(), public_keys })
 }

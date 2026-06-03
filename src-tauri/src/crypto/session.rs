@@ -1,4 +1,10 @@
-//! Session manager: maps contact IDs → RatchetState, persists to SQLite.
+//! @faridguzman91: Session manager — ties X3DH and the Double Ratchet together
+//! and persists session state per contact in SQLite.
+//!
+//! One SessionManager is created per request (borrowing the DB connection).
+//! State is serialised as JSON and stored in the `sessions` table; loading
+//! and saving happens on every encrypt/decrypt call so the ratchet always
+//! reflects the latest state even across app restarts.
 
 use base64::{engine::general_purpose::STANDARD as B64, Engine};
 use rusqlite::{params, Connection};
@@ -16,7 +22,6 @@ impl<'a> SessionManager<'a> {
         Self { db }
     }
 
-    /// Load or create a ratchet session for the given contact.
     fn load_state(&self, contact_id: &str) -> Option<RatchetState> {
         self.db
             .query_row(
@@ -39,7 +44,9 @@ impl<'a> SessionManager<'a> {
         Ok(())
     }
 
-    /// Initiator: perform X3DH against a remote bundle and initialise a new ratchet session.
+    /// @faridguzman91: Initiator path — run X3DH against the remote bundle, seed the
+    /// Double Ratchet, persist state, and return the ephemeral key (EK_A) so the caller
+    /// can include it in the first message envelope.
     pub fn init_outbound_session(
         &self,
         contact_id: &str,
@@ -57,7 +64,9 @@ impl<'a> SessionManager<'a> {
         Ok(x3dh_out.ephemeral_key)
     }
 
-    /// Recipient: derive X3DH shared secret and initialise ratchet session.
+    /// @faridguzman91: Recipient path — run X3DH receive with the initiator's EK_A,
+    /// seed the Double Ratchet, persist state. Called when a first message arrives
+    /// (identified by the presence of ephemeralKey in the WS envelope).
     pub fn init_inbound_session(
         &self,
         contact_id: &str,
@@ -79,12 +88,13 @@ impl<'a> SessionManager<'a> {
 
         let our_ik = secret_from_bytes(our_ik_secret_bytes);
         let our_spk = secret_from_bytes(our_spk_secret_bytes);
+        // @faridguzman91: Fresh ratchet key for this session's initial DH step
         let ratchet_key = StaticSecret::random_from_rng(rand::rngs::OsRng);
 
         let shared_secret = x3dh::receive(
             &our_ik,
             &our_spk,
-            None,
+            None, // TODO: look up and pass the OPK secret if otpk_id is present
             &pub_from_bytes(initiator_ik_pub_bytes),
             &pub_from_bytes(ephemeral_key_bytes),
         )?;

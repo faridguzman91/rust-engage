@@ -1,3 +1,5 @@
+// @faridguzman91: App entry point — wires PrimeVue 4 (Aura dark theme), Pinia, and Vue Router.
+// Dark mode is class-based (.dark on <html>) so PrimeVue tokens respond correctly.
 import { createApp } from "vue";
 import { createPinia } from "pinia";
 import PrimeVue from "primevue/config";
@@ -17,7 +19,8 @@ app.use(PrimeVue, {
   theme: {
     preset: Aura,
     options: {
-      darkModeSelector: ".dark",   // we control dark mode by toggling this class on <html>
+      // @faridguzman91: we toggle dark mode ourselves by adding .dark to <html> on mount
+      darkModeSelector: ".dark",
       cssLayer: {
         name: "primevue",
         order: "tailwind-base, primevue, tailwind-utilities",

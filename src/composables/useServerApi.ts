@@ -1,3 +1,6 @@
+// @faridguzman91: Typed fetch wrapper for the relay server.
+// Automatically attaches the Bearer JWT to every request.
+// On 401 (token expired/revoked), clears localStorage and redirects to /login.
 import { SERVER_BASE } from "../config";
 import type { PreKeyBundle } from "./useCrypto";
 
@@ -12,7 +15,7 @@ export interface RegisterPayload {
 export interface SendEnvelopePayload {
   recipientId: string;
   senderIk: string;
-  ephemeralKey?: string;
+  ephemeralKey?: string;   // only present on the first message (X3DH initiator envelope)
   otpkId?: number;
   ciphertext: string;
 }
@@ -21,6 +24,8 @@ function getToken(): string | null {
   return localStorage.getItem("engage_jwt");
 }
 
+// @faridguzman91: Generic request helper — handles JSON Content-Type, auth header,
+// 401 redirect, and empty-body (204) responses.
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {};
@@ -34,7 +39,6 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   });
 
   if (res.status === 401) {
-    // Token expired — clear it so the router redirects to login
     localStorage.removeItem("engage_jwt");
     window.location.hash = "#/login";
     throw new Error("session expired");
@@ -50,10 +54,14 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export function useServerApi() {
+  // @faridguzman91: Register uploads public crypto keys after first identity creation.
+  // The server derives user_id from the JWT — the body cannot override it.
   async function register(payload: RegisterPayload): Promise<void> {
     return request("POST", "/api/register", payload);
   }
 
+  // @faridguzman91: Fetches a remote contact's prekey bundle for X3DH session init.
+  // The server atomically marks one OPK as used so it is never served twice.
   async function fetchPreKeyBundle(userId: string): Promise<PreKeyBundle> {
     return request("GET", `/api/keys/${encodeURIComponent(userId)}`);
   }
@@ -70,6 +78,8 @@ export function useServerApi() {
     return request("GET", `/api/messages/${encodeURIComponent(userId)}`);
   }
 
+  // @faridguzman91: Returns how many unused OPKs the server holds for us.
+  // Used by useOpkReplenishment to decide whether to upload a new batch.
   async function fetchOpkCount(userId: string): Promise<{ remaining: number }> {
     return request("GET", `/api/keys/${encodeURIComponent(userId)}/prekeys/count`);
   }

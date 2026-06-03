@@ -1,3 +1,6 @@
+// @faridguzman91: Tauri application entry point.
+// Registers all IPC commands, initialises the SQLite database, and sets up
+// the deep-link handler (engage:// scheme) for production OAuth callbacks.
 mod commands;
 mod crypto;
 mod storage;
@@ -7,6 +10,8 @@ use std::sync::Mutex;
 use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
 
+// @faridguzman91: AppState holds the single SQLite connection behind a Mutex.
+// All Tauri commands that touch the DB acquire this lock.
 pub struct AppState {
     pub db: Mutex<Connection>,
 }
@@ -23,8 +28,9 @@ pub fn run() {
             let conn = storage::db::open(&db_path).expect("failed to open database");
             app.manage(AppState { db: Mutex::new(conn) });
 
-            // Register for deep-link events (engage://...)
-            // The frontend listens via the JS plugin API
+            // @faridguzman91: Register the engage:// URI scheme so Windows routes
+            // OAuth deep-link callbacks to this app in production builds.
+            // In dev mode the server uses FRONTEND_URL=http://localhost:1420 instead.
             #[cfg(desktop)]
             app.deep_link().register("engage")?;
 
