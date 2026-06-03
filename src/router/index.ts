@@ -7,6 +7,11 @@ const router = createRouter({
   routes: [
     { path: "/", redirect: "/chat" },
     {
+      // OAuth callback: server redirects here with ?token=JWT in dev mode
+      path: "/auth",
+      component: () => import("../views/AuthCallbackView.vue"),
+    },
+    {
       path: "/login",
       component: () => import("../views/LoginView.vue"),
       meta: { requiresNoAuth: true },

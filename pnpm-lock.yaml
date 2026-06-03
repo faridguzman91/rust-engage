@@ -2,7 +2,6 @@ lockfileVersion: 5.4
 
 specifiers:
   '@primeuix/themes': ^2.0.3
-  '@primevue/themes': ^4.5.4
   '@tauri-apps/api': ^2
   '@tauri-apps/cli': ^2
   '@tauri-apps/plugin-deep-link': ^2.4.9
@@ -19,7 +18,6 @@ specifiers:
 
 dependencies:
   '@primeuix/themes': 2.0.3
-  '@primevue/themes': 4.5.4
   '@tauri-apps/api': 2.11.0
   '@tauri-apps/plugin-deep-link': 2.4.9
   '@tauri-apps/plugin-opener': 2.5.4
@@ -340,15 +338,6 @@ packages:
       '@primevue/core': 4.5.5_vue@3.5.35
     transitivePeerDependencies:
       - vue
-    dev: false
-
-  /@primevue/themes/4.5.4:
-    resolution: {integrity: sha512-rUFZxMHLanTZdvZq4zgZPk+KRBZ3s7fE3bBK32OrZBkHQhEJmkJ7Ftd4w4QFlXyz1B7c+k5invZiOOCjwHXg9Q==}
-    engines: {node: '>=12.11.0'}
-    deprecated: 'Deprecated. This package is no longer maintained. Please migrate to @primeuix/themes: https://www.npmjs.com/package/@primeuix/themes'
-    dependencies:
-      '@primeuix/styled': 0.7.4
-      '@primeuix/themes': 2.0.3
     dev: false
 
   /@rollup/rollup-android-arm-eabi/4.61.0:

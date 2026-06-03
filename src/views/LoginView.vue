@@ -15,8 +15,11 @@ async function login() {
   loading.value = true;
   error.value = "";
   try {
-    await Promise.all([auth.loginWithGoogle(), auth.listenForDeepLink()]);
-    router.push(auth.isAuthenticated ? "/setup" : "/");
+    // Opens the system browser to start Google OAuth.
+    // The server will redirect back to http://localhost:1420/#/auth?token=JWT (dev)
+    // or engage://auth?token=JWT (production), which the router handles.
+    await auth.loginWithGoogle();
+    // Keep loading=true — the browser will bring the user back via the /auth route
   } catch (e) {
     error.value = String(e);
     loading.value = false;

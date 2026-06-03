@@ -15,11 +15,6 @@ onMounted(async () => {
   // Enable PrimeVue dark mode
   document.documentElement.classList.add("dark");
 
-  // Listen for the OAuth deep-link callback (engage://auth?token=...)
-  auth.listenForDeepLink().then(() => {
-    identity.initialize();
-  });
-
   // Load existing identity if already authenticated
   if (auth.isAuthenticated) {
     await identity.initialize();
