@@ -1,47 +1,66 @@
+/* ── Engage design tokens (override PrimeVue Aura defaults) ─────────────── */
 :root {
-  --accent: #5865f2;
-  --bg-primary: #ffffff;
-  --bg-secondary: #f5f5f5;
-  --bg-hover: #ebebeb;
-  --bg-active: #e0e2ff;
-  --bg-input: #ffffff;
-  --text-primary: #111111;
-  --text-muted: #666666;
-  --border: #e0e0e0;
-  --danger: #e53e3e;
+  --engage-accent:     #3ebf8c;   /* Signal-green */
+  --engage-accent-dim: #2fa678;
+  --engage-sent-bg:    #3ebf8c;
+  --engage-sent-fg:    #ffffff;
+  --engage-recv-bg:    #2a2a3c;
+  --engage-recv-fg:    #e8eaf6;
+
+  /* Sidebar */
+  --engage-sidebar-bg: #1e1e2e;
+  --engage-sidebar-hover: #2a2a3c;
+  --engage-sidebar-active: #2d3a4a;
+
+  /* Main */
+  --engage-main-bg:   #12121c;
+  --engage-header-bg: #1a1a2a;
+  --engage-border:    rgba(255,255,255,0.07);
+  --engage-input-bg:  #2a2a3c;
+  --engage-text:      #e8eaf6;
+  --engage-muted:     #8892b0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --accent: #5865f2;
-    --bg-primary: #1a1a2e;
-    --bg-secondary: #16213e;
-    --bg-hover: #1f2d4a;
-    --bg-active: #2a3a5c;
-    --bg-input: #1f2d4a;
-    --text-primary: #e8eaf6;
-    --text-muted: #8892b0;
-    --border: #2a3a5c;
-    --danger: #fc8181;
-  }
-}
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/* ── Apply dark theme by default (desktop chat apps are dark) ─────────── */
+html { color-scheme: dark; }
 
 body {
-  font-family: Inter, system-ui, -apple-system, sans-serif;
+  margin: 0;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
   font-size: 15px;
   line-height: 1.5;
-  color: var(--text-primary);
-  background: var(--bg-primary);
+  background: var(--engage-main-bg);
+  color: var(--engage-text);
   -webkit-font-smoothing: antialiased;
 }
 
-#app {
-  height: 100vh;
-  overflow: hidden;
+*, *::before, *::after { box-sizing: border-box; }
+
+#app { height: 100vh; overflow: hidden; }
+
+/* ── PrimeVue surface / primary overrides ───────────────────────────────── */
+.dark {
+  --p-surface-0:    #12121c;
+  --p-surface-50:   #1a1a2a;
+  --p-surface-100:  #1e1e2e;
+  --p-surface-200:  #2a2a3c;
+  --p-surface-300:  #363650;
+  --p-surface-400:  #4a4a64;
+  --p-surface-600:  #8892b0;
+  --p-surface-700:  #aab0c8;
+  --p-surface-800:  #c8cde0;
+  --p-surface-900:  #e8eaf6;
+  --p-surface-950:  #f4f5fb;
+  --p-primary-color:         #3ebf8c;
+  --p-primary-hover-color:   #2fa678;
+  --p-primary-active-color:  #27956a;
+  --p-primary-contrast-color:#ffffff;
 }
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--engage-border); border-radius: 4px; }
+
+/* ── Utility ────────────────────────────────────────────────────────────── */
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

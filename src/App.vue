@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import Toast from "primevue/toast";
 import { useAuthStore } from "./stores/auth";
 import { useIdentityStore } from "./stores/identity";
 import { useMessagesStore } from "./stores/messages";
@@ -11,6 +12,9 @@ const identity = useIdentityStore();
 const messagesStore = useMessagesStore();
 
 onMounted(async () => {
+  // Enable PrimeVue dark mode
+  document.documentElement.classList.add("dark");
+
   // Listen for the OAuth deep-link callback (engage://auth?token=...)
   // This resolves if the app is opened via a deep-link during this session.
   auth.listenForDeepLink().then(() => {
@@ -64,5 +68,10 @@ onMounted(async () => {
 </script>
 
 <template>
+  <Toast position="bottom-right" />
   <router-view />
 </template>
+
+<script>
+// auto-imported component registration not needed — imported below
+</script>

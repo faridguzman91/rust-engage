@@ -3,171 +3,205 @@ import { ref } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useContactsStore } from "../stores/contacts";
 import { useIdentityStore } from "../stores/identity";
+import Button from "primevue/button";
+import InputText from "primevue/inputtext";
+import Dialog from "primevue/dialog";
+import Message from "primevue/message";
+import Avatar from "primevue/avatar";
+import Divider from "primevue/divider";
+import FloatLabel from "primevue/floatlabel";
 
 const router = useRouter();
 const route = useRoute();
 const contacts = useContactsStore();
 const identity = useIdentityStore();
 
-const showAddContact = ref(false);
+const showDialog = ref(false);
 const newContactKey = ref("");
 const newContactName = ref("");
 const addError = ref("");
+const adding = ref(false);
 
 async function addContact() {
+  if (!newContactName.value.trim() || !newContactKey.value.trim()) return;
+  adding.value = true;
   addError.value = "";
   try {
     const contact = await contacts.addContact(newContactKey.value.trim(), newContactName.value.trim());
-    showAddContact.value = false;
+    showDialog.value = false;
     newContactKey.value = "";
     newContactName.value = "";
     router.push(`/chat/${contact.id}`);
   } catch (e) {
     addError.value = String(e);
+  } finally {
+    adding.value = false;
   }
+}
+
+function avatarLabel(name: string) {
+  return name?.[0]?.toUpperCase() ?? "?";
 }
 </script>
 
 <template>
-  <div class="conversation-list">
-    <header class="list-header">
-      <span class="app-name">engage</span>
+  <div class="conv-list">
+    <!-- Header -->
+    <div class="conv-header">
+      <span class="brand">engage</span>
       <div class="header-actions">
-        <button class="icon-btn" title="New conversation" @click="showAddContact = true">+</button>
-        <router-link to="/settings" class="icon-btn" title="Settings">⚙</router-link>
-      </div>
-    </header>
-
-    <div v-if="showAddContact" class="add-contact-form">
-      <input v-model="newContactName" placeholder="Display name" />
-      <input v-model="newContactKey" placeholder="Identity public key" />
-      <p v-if="addError" class="error">{{ addError }}</p>
-      <div class="form-actions">
-        <button @click="addContact">Add</button>
-        <button class="cancel" @click="showAddContact = false">Cancel</button>
+        <Button
+          icon="pi pi-pencil"
+          text rounded size="small"
+          v-tooltip.bottom="'New conversation'"
+          @click="showDialog = true"
+        />
+        <Button
+          icon="pi pi-cog"
+          text rounded size="small"
+          v-tooltip.bottom="'Settings'"
+          @click="router.push('/settings')"
+        />
       </div>
     </div>
 
-    <div class="identity-bar">
-      <span class="identity-name">{{ identity.displayName }}</span>
+    <!-- Own identity chip -->
+    <div class="self-row">
+      <Avatar
+        :label="avatarLabel(identity.displayName)"
+        shape="circle"
+        size="normal"
+        style="background: var(--engage-accent); color: #fff; font-weight:700; font-size:0.85rem;"
+      />
+      <div class="self-info">
+        <span class="self-name">{{ identity.displayName }}</span>
+        <span class="self-tag">You</span>
+      </div>
     </div>
 
-    <ul class="contacts">
-      <li
+    <Divider style="margin: 0;" />
+
+    <!-- Contact list -->
+    <div class="contacts-scroll">
+      <div
         v-for="contact in contacts.contacts"
         :key="contact.id"
+        class="contact-row"
         :class="{ active: route.params.contactId === contact.id }"
         @click="router.push(`/chat/${contact.id}`)"
       >
-        <div class="avatar">{{ contact.displayName[0]?.toUpperCase() }}</div>
+        <Avatar
+          :label="avatarLabel(contact.displayName)"
+          shape="circle"
+          size="normal"
+          style="background: #4a4a78; color: #e8eaf6; font-weight:600; flex-shrink:0;"
+        />
         <div class="contact-info">
-          <span class="contact-name">{{ contact.displayName }}</span>
+          <span class="contact-name truncate">{{ contact.displayName }}</span>
         </div>
-      </li>
-    </ul>
+      </div>
+
+      <div v-if="contacts.contacts.length === 0" class="no-contacts">
+        <i class="pi pi-user-plus" style="font-size:1.5rem; opacity:0.3;" />
+        <p>No contacts yet.<br />Add one to start chatting.</p>
+      </div>
+    </div>
   </div>
+
+  <!-- Add contact dialog -->
+  <Dialog
+    v-model:visible="showDialog"
+    header="New conversation"
+    :style="{ width: '380px' }"
+    :modal="true"
+    :draggable="false"
+  >
+    <div class="dialog-body">
+      <FloatLabel variant="on">
+        <InputText id="c-name" v-model="newContactName" class="w-full" />
+        <label for="c-name">Display name</label>
+      </FloatLabel>
+      <FloatLabel variant="on">
+        <InputText id="c-key" v-model="newContactKey" class="w-full" />
+        <label for="c-key">Identity public key</label>
+      </FloatLabel>
+      <Message v-if="addError" severity="error" :closable="false">{{ addError }}</Message>
+    </div>
+    <template #footer>
+      <Button label="Cancel" text @click="showDialog = false" />
+      <Button
+        label="Add contact"
+        icon="pi pi-user-plus"
+        :loading="adding"
+        :disabled="!newContactName.trim() || !newContactKey.trim()"
+        @click="addContact"
+      />
+    </template>
+  </Dialog>
 </template>
 
 <style scoped>
-.conversation-list {
+.conv-list {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--bg-secondary);
+  background: var(--engage-sidebar-bg);
+  overflow: hidden;
 }
-.list-header {
+.conv-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem;
-  border-bottom: 1px solid var(--border);
+  padding: 0.85rem 1rem;
+  flex-shrink: 0;
 }
-.app-name {
-  font-weight: 700;
-  font-size: 1.1rem;
-  color: var(--accent);
+.brand {
+  font-weight: 800;
+  font-size: 1.15rem;
+  color: var(--engage-accent);
+  letter-spacing: -0.02em;
 }
-.header-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-.icon-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1.1rem;
-  color: var(--text-muted);
-  padding: 0.2rem 0.4rem;
-  border-radius: 4px;
-  text-decoration: none;
-}
-.icon-btn:hover { background: var(--bg-hover); }
-.identity-bar {
-  padding: 0.5rem 1rem;
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
-}
-.contacts {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  overflow-y: auto;
-  flex: 1;
-}
-.contacts li {
+.header-actions { display: flex; gap: 0.25rem; }
+.self-row {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  cursor: pointer;
-  transition: background 0.1s;
-}
-.contacts li:hover { background: var(--bg-hover); }
-.contacts li.active { background: var(--bg-active); }
-.avatar {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 1rem;
+  padding: 0.6rem 1rem;
   flex-shrink: 0;
 }
-.contact-name { font-size: 0.95rem; }
-.add-contact-form {
-  padding: 0.75rem 1rem;
+.self-info { display: flex; flex-direction: column; min-width: 0; }
+.self-name { font-size: 0.9rem; font-weight: 600; color: var(--engage-text); }
+.self-tag { font-size: 0.72rem; color: var(--engage-accent); font-weight: 500; }
+.contacts-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+}
+.contact-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+  transition: background 0.1s;
+  border-radius: 0;
+}
+.contact-row:hover { background: var(--engage-sidebar-hover); }
+.contact-row.active { background: var(--engage-sidebar-active); }
+.contact-info { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.contact-name { font-size: 0.92rem; font-weight: 500; color: var(--engage-text); }
+.no-contacts {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  border-bottom: 1px solid var(--border);
-}
-.add-contact-form input {
-  padding: 0.4rem 0.6rem;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-input);
-  color: var(--text-primary);
-  font-size: 0.9rem;
-}
-.form-actions { display: flex; gap: 0.5rem; }
-.form-actions button {
-  flex: 1;
-  padding: 0.4rem;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-  background: var(--accent);
-  color: #fff;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  color: var(--engage-muted);
+  text-align: center;
   font-size: 0.85rem;
+  line-height: 1.6;
 }
-.form-actions button.cancel {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-.error { font-size: 0.8rem; color: var(--danger); }
+.dialog-body { display: flex; flex-direction: column; gap: 1.25rem; padding: 0.25rem 0 0.5rem; }
+.w-full { width: 100%; }
 </style>

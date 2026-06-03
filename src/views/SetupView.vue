@@ -2,10 +2,14 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useIdentityStore } from "../stores/identity";
+import Card from "primevue/card";
+import InputText from "primevue/inputtext";
+import Button from "primevue/button";
+import Message from "primevue/message";
+import FloatLabel from "primevue/floatlabel";
 
 const router = useRouter();
 const identity = useIdentityStore();
-
 const displayName = ref("");
 const loading = ref(false);
 const error = ref("");
@@ -26,103 +30,84 @@ async function setup() {
 </script>
 
 <template>
-  <div class="setup-view">
-    <div class="setup-card">
-      <h1 class="logo">engage</h1>
-      <p class="subtitle">End-to-end encrypted messaging</p>
+  <div class="setup-wrap">
+    <Card class="setup-card">
+      <template #header>
+        <div class="setup-header">
+          <img src="/engage.png" alt="engage" class="logo" />
+          <p class="subtitle">Set up your identity</p>
+        </div>
+      </template>
+      <template #content>
+        <div class="setup-body">
+          <FloatLabel variant="on">
+            <InputText
+              id="display-name"
+              v-model="displayName"
+              autocomplete="off"
+              class="w-full"
+              @keydown.enter="setup"
+            />
+            <label for="display-name">Your display name</label>
+          </FloatLabel>
 
-      <form @submit.prevent="setup">
-        <label for="display-name">Your display name</label>
-        <input
-          id="display-name"
-          v-model="displayName"
-          type="text"
-          placeholder="e.g. Alice"
-          autocomplete="off"
-          required
-        />
-        <p v-if="error" class="error">{{ error }}</p>
-        <button type="submit" :disabled="loading || !displayName.trim()">
-          {{ loading ? "Generating keys…" : "Create identity" }}
-        </button>
-      </form>
+          <Message v-if="error" severity="error" :closable="false" class="w-full">{{ error }}</Message>
 
-      <p class="hint">
-        Your identity keys are generated locally and never leave your device unencrypted.
-      </p>
-    </div>
+          <Button
+            label="Create identity"
+            icon="pi pi-key"
+            class="w-full"
+            :loading="loading"
+            :disabled="!displayName.trim()"
+            @click="setup"
+          />
+
+          <p class="hint">
+            <i class="pi pi-lock" style="font-size:0.75rem" />
+            Keys are generated locally and never leave your device unencrypted.
+          </p>
+        </div>
+      </template>
+    </Card>
   </div>
 </template>
 
 <style scoped>
-.setup-view {
+.setup-wrap {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: var(--bg-primary);
+  background: var(--engage-main-bg);
 }
 .setup-card {
-  width: 360px;
-  padding: 2.5rem 2rem;
-  background: var(--bg-secondary);
-  border-radius: 12px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  width: 380px;
+  background: var(--engage-sidebar-bg) !important;
+  border: 1px solid var(--engage-border) !important;
+  border-radius: 16px !important;
+}
+.setup-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.5rem 1.5rem 0;
+}
+.logo { width: 180px; }
+.subtitle { color: var(--engage-muted); font-size: 0.9rem; margin: 0; }
+.setup-body {
   display: flex;
   flex-direction: column;
   gap: 1rem;
 }
-.logo {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--accent);
-  text-align: center;
-  margin: 0;
-}
-.subtitle {
-  text-align: center;
-  color: var(--text-muted);
-  margin: 0;
-  font-size: 0.9rem;
-}
-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-label {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-}
-input {
-  padding: 0.6rem 0.8rem;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: var(--bg-input);
-  color: var(--text-primary);
-  font-size: 1rem;
-}
-button {
-  padding: 0.7rem;
-  border-radius: 8px;
-  border: none;
-  background: var(--accent);
-  color: #fff;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.error {
-  color: var(--danger);
-  font-size: 0.85rem;
-}
 .hint {
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--engage-muted);
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
 }
+.w-full { width: 100%; }
 </style>
