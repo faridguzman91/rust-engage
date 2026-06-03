@@ -1,0 +1,4 @@
+[target.x86_64-pc-windows-gnu]
+linker = "C:/Users/farid/scoop/apps/mingw/current/bin/gcc.exe"
+ar = "C:/Users/farid/scoop/apps/mingw/current/bin/ar.exe"
+rustflags = ["-C", "link-arg=-fuse-ld=lld"]

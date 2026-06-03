@@ -7,7 +7,7 @@ use chrono::Utc;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use rusqlite::params;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use base64::Engine as _;
 use crate::auth::issue_jwt;
@@ -64,7 +64,8 @@ pub struct CallbackParams {
 
 #[derive(Deserialize)]
 struct TokenResponse {
-    access_token: String,
+    #[allow(dead_code)]
+    access_token: String,   // kept for future use (e.g. calling other Google APIs)
     id_token: String,
 }
 
