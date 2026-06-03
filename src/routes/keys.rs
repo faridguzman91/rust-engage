@@ -110,3 +110,24 @@ pub async fn upload_prekeys(
     }
     Ok(StatusCode::NO_CONTENT)
 }
+
+/// GET /api/keys/:userId/prekeys/count — how many unused OPKs does the server hold?
+/// Only the owning user can query their own count.
+pub async fn opk_count(
+    State(state): State<AppState>,
+    Extension(claims): Extension<Claims>,
+    Path(user_id): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    if claims.sub != user_id {
+        return Err((StatusCode::FORBIDDEN, "cannot query another user's prekey count".into()));
+    }
+    let db = state.db.lock().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let count: u32 = db
+        .query_row(
+            "SELECT COUNT(*) FROM one_time_prekeys WHERE user_id=?1 AND used=0",
+            params![claims.sub],
+            |row| row.get(0),
+        )
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(Json(serde_json::json!({ "remaining": count })))
+}

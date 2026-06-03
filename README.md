@@ -208,6 +208,17 @@ Fetch a prekey bundle to initiate an X3DH session with `:userId`. Atomically mar
 
 ---
 
+#### `GET /api/keys/:userId/prekeys/count` [protected]
+
+Returns how many unused one-time prekeys the server currently holds for the user. Only the owning user can query their own count. The client uses this to decide whether to upload a fresh batch.
+
+**Response** `200 OK`
+```json
+{ "remaining": 42 }
+```
+
+---
+
 #### `POST /api/keys/:userId/prekeys` [protected]
 
 Replenish the one-time prekey pool. Only the authenticated user can upload keys for themselves.
@@ -332,7 +343,7 @@ All tables are created automatically on first startup. WAL journal mode is enabl
 ## Security notes
 
 - **Sender identity is server-enforced.** The `sender_id` on every stored message comes from the JWT `sub` claim, not the request body — a compromised client cannot impersonate another user.
-- **One-time prekeys** provide forward secrecy for the first message. If the pool empties, sessions fall back to the signed prekey only — clients should replenish via `POST /api/keys/:id/prekeys` proactively.
+- **One-time prekeys** provide forward secrecy for the first message. If the pool empties, sessions fall back to the signed prekey only. The client automatically replenishes the pool (batch of 100) whenever the count drops below 10 — triggered on WS connect and after each new outbound session.
 - **JWTs are 30-day tokens.** The server is stateless — there is no revocation list. For stricter security, reduce `JWT_EXPIRY_SECS` in `src/auth.rs` and implement a refresh token flow.
 - **TLS is required** in any non-localhost deployment. Run behind a reverse proxy (nginx, Caddy) that terminates TLS and proxies both HTTP (`/api/*`) and WebSocket (`/ws/*`) traffic.
 - **CSRF protection** for the OAuth flow uses a 32-byte random state token stored in the database with a 5-minute TTL.

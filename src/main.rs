@@ -51,6 +51,7 @@ async fn main() {
         .route("/api/register", post(routes::keys::register))
         .route("/api/keys/{user_id}", get(routes::keys::get_prekey_bundle))
         .route("/api/keys/{user_id}/prekeys", post(routes::keys::upload_prekeys))
+        .route("/api/keys/{user_id}/prekeys/count", get(routes::keys::opk_count))
         .route("/api/messages", post(routes::messages::send_message))
         .route("/api/messages/{user_id}", get(routes::messages::fetch_messages))
         .route("/ws/{user_id}", get(routes::ws::ws_handler))
