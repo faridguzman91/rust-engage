@@ -84,6 +84,27 @@ export const useMessagesStore = defineStore("messages", () => {
     }
   }
 
+  // @faridguzman91: sendControl sends an encrypted control message (e.g. sender key
+  // distribution) via the pairwise ratchet without creating a visible chat message.
+  async function sendControl(contactId: string, payload: object): Promise<void> {
+    const contacts = useContactsStore();
+    const identity = useIdentityStore();
+    const api = useServerApi();
+
+    const ephemeralKey = await contacts.ensureSession(contactId);
+    const body = JSON.stringify({ __control: true, ...payload });
+    const encrypted = await invoke<{ ciphertext: string; messageType: number }>(
+      "encrypt_message",
+      { contactId, plaintext: body }
+    );
+    await api.sendEnvelope({
+      recipientId: contactId,
+      senderIk: identity.keys?.identityPublicKey ?? "",
+      ephemeralKey: ephemeralKey ?? undefined,
+      ciphertext: encrypted.ciphertext,
+    });
+  }
+
   // @faridguzman91: Remove a single message from the in-memory store.
   // Called by useDisappearingMessages when a timer fires.
   // DB deletion is handled separately by sweep_expired_messages.
@@ -98,5 +119,5 @@ export const useMessagesStore = defineStore("messages", () => {
     return byConversation.value[id] ?? [];
   }
 
-  return { byConversation, load, send, append, remove, forConversation };
+  return { byConversation, load, send, sendControl, append, remove, forConversation };
 });

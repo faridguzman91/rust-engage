@@ -12,6 +12,7 @@ import type { Message } from "../stores/messages";
 import { SERVER_WS } from "../config";
 import { useOpkReplenishment } from "./useOpkReplenishment";
 import { useDisappearingMessages } from "./useDisappearingMessages";
+import { useGroupsStore } from "../stores/groups";
 
 function getToken(): string {
   return localStorage.getItem("engage_jwt") ?? "";
@@ -116,6 +117,46 @@ export function useWebSocket() {
         }
 
         // ACK delivery back to server
+        send({ type: "ack", messageId: raw.id });
+      }
+
+      // @faridguzman91: Group message — decrypt with the sender's Sender Key
+      if (envelope.type === "group_message") {
+        const raw = envelope.payload as {
+          id: string;
+          groupId: string;
+          senderId: string;
+          senderIk: string;
+          ciphertext: string;
+          timestamp: number;
+        };
+
+        const groups = useGroupsStore();
+        let body: string;
+        try {
+          body = await groups.decryptMessage(raw.groupId, raw.senderId, raw.ciphertext);
+        } catch {
+          body = "[encrypted group message]";
+        }
+
+        // @faridguzman91: Check if this is a control message (Sender Key distribution)
+        try {
+          const ctrl = JSON.parse(body);
+          if (ctrl.__control && ctrl.type === "sender_key_distribution") {
+            await groups.receiveDistribution(ctrl.payload);
+            return; // don't display control messages
+          }
+        } catch { /* not JSON — regular message */ }
+
+        messagesStore.append({
+          id: raw.id,
+          conversationId: raw.groupId,
+          senderId: raw.senderId,
+          body,
+          timestamp: raw.timestamp,
+          status: "delivered",
+          isMine: false,
+        });
         send({ type: "ack", messageId: raw.id });
       }
     };

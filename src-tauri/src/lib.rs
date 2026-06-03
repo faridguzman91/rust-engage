@@ -55,6 +55,12 @@ pub fn run() {
             commands::disappear::set_disappear_timer,
             commands::disappear::set_message_expiry,
             commands::disappear::sweep_expired_messages,
+            commands::groups::cache_group,
+            commands::groups::list_cached_groups,
+            commands::groups::encrypt_group_message,
+            commands::groups::decrypt_group_message,
+            commands::groups::get_sender_key_distribution,
+            commands::groups::store_received_sender_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running engage");

@@ -35,6 +35,12 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresIdentity: true },
     },
     {
+      // @faridguzman91: Group conversation thread
+      path: "/group/:groupId",
+      component: () => import("../views/GroupView.vue"),
+      meta: { requiresAuth: true, requiresIdentity: true },
+    },
+    {
       path: "/settings",
       component: () => import("../views/SettingsView.vue"),
       meta: { requiresAuth: true, requiresIdentity: true },

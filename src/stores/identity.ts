@@ -10,6 +10,13 @@ import { useServerApi } from "../composables/useServerApi";
 import { useWebSocket } from "../composables/useWebSocket";
 import { useAuthStore } from "./auth";
 
+// @faridguzman91: Re-export userId as a module-level computed so groups.ts can
+// access it without importing the whole store (avoids circular imports).
+export function useUserId(): string {
+  const auth = useAuthStore();
+  return auth.profile?.userId ?? "";
+}
+
 export interface IdentityKeys {
   identityPublicKey: string;
   signedPreKeyPublicKey: string;

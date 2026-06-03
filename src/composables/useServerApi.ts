@@ -79,10 +79,48 @@ export function useServerApi() {
   }
 
   // @faridguzman91: Returns how many unused OPKs the server holds for us.
-  // Used by useOpkReplenishment to decide whether to upload a new batch.
   async function fetchOpkCount(userId: string): Promise<{ remaining: number }> {
     return request("GET", `/api/keys/${encodeURIComponent(userId)}/prekeys/count`);
   }
 
-  return { register, fetchPreKeyBundle, uploadPreKeys, sendEnvelope, fetchPendingMessages, fetchOpkCount };
+  // ── Group API ───────────────────────────────────────────────────────────────
+
+  async function createGroup(payload: { name: string; members: string[] }) {
+    return request<import("../stores/groups").Group>("POST", "/api/groups", payload);
+  }
+
+  async function listGroups() {
+    return request<import("../stores/groups").Group[]>("GET", "/api/groups");
+  }
+
+  async function getGroup(groupId: string) {
+    return request<import("../stores/groups").Group>("GET", `/api/groups/${encodeURIComponent(groupId)}`);
+  }
+
+  async function addGroupMember(groupId: string, userId: string) {
+    return request<import("../stores/groups").GroupMember>(
+      "POST",
+      `/api/groups/${encodeURIComponent(groupId)}/members`,
+      { userId }
+    );
+  }
+
+  async function removeGroupMember(groupId: string, userId: string) {
+    return request<void>(
+      "DELETE",
+      `/api/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(userId)}`
+    );
+  }
+
+  async function sendGroupEnvelope(groupId: string, payload: { senderIk: string; ciphertext: string }) {
+    return request<void>("POST", `/api/groups/${encodeURIComponent(groupId)}/messages`, {
+      groupId,
+      ...payload,
+    });
+  }
+
+  return {
+    register, fetchPreKeyBundle, uploadPreKeys, sendEnvelope, fetchPendingMessages, fetchOpkCount,
+    createGroup, listGroups, getGroup, addGroupMember, removeGroupMember, sendGroupEnvelope,
+  };
 }

@@ -58,6 +58,25 @@ fn migrate(conn: &Connection) -> Result<()> {
             private_key BLOB NOT NULL,
             used        INTEGER NOT NULL DEFAULT 0
         );
+
+        -- @faridguzman91: Group metadata cached locally for display
+        CREATE TABLE IF NOT EXISTS groups (
+            id          TEXT PRIMARY KEY,
+            name        TEXT NOT NULL,
+            created_by  TEXT NOT NULL
+        );
+
+        -- @faridguzman91: Sender Keys for group messaging.
+        -- is_ours=1 means this is the key we generate and distribute to others.
+        -- is_ours=0 means it was received from another member and we use it to decrypt.
+        CREATE TABLE IF NOT EXISTS sender_keys (
+            group_id    TEXT NOT NULL,
+            user_id     TEXT NOT NULL,
+            key_bytes   BLOB NOT NULL,
+            iteration   INTEGER NOT NULL DEFAULT 0,
+            is_ours     INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (group_id, user_id)
+        );
         ",
     )?;
 
