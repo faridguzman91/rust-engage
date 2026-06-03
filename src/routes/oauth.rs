@@ -113,9 +113,10 @@ pub async fn callback(
             .unwrap_or(false);
 
         if !valid {
-            return (StatusCode::BAD_REQUEST, "invalid or expired state").into_response();
+            return (StatusCode::BAD_REQUEST, "invalid or expired state — please try signing in again").into_response();
         }
-        let _ = db.execute("DELETE FROM oauth_states WHERE state=?1", params![params.state]);
+        // Don't delete the state yet — only remove it after the full flow succeeds
+        // so the user can retry if the token exchange fails
     }
 
     // Exchange code for tokens
@@ -191,6 +192,12 @@ pub async fn callback(
         Ok(t) => t,
         Err(e) => return (StatusCode::INTERNAL_SERVER_ERROR, e).into_response(),
     };
+
+    // Everything succeeded — now consume the CSRF state so it can't be replayed
+    {
+        let db = state.db.lock().unwrap();
+        let _ = db.execute("DELETE FROM oauth_states WHERE state=?1", params![params.state]);
+    }
 
     // Deep-link back into the Tauri app
     Redirect::temporary(&format!("engage://auth?token={token}")).into_response()
