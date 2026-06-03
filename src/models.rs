@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
+// @faridguzman91: userId is intentionally absent — the server derives it from the
+// JWT claims.sub so the client cannot forge or override their own identity.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterRequest {
-    #[serde(rename = "userId")]
-    pub user_id: String,
     #[serde(rename = "displayName")]
     pub display_name: String,
     #[serde(rename = "identityKey")]
