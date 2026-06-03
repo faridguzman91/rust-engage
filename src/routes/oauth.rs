@@ -120,23 +120,34 @@ pub async fn callback(
     }
 
     // Exchange code for tokens
-    let token_res: TokenResponse = match reqwest::Client::new()
-        .post(GOOGLE_TOKEN_URL)
-        .form(&[
-            ("code", params.code.as_str()),
-            ("client_id", state.oauth.client_id.as_str()),
-            ("client_secret", state.oauth.client_secret.as_str()),
-            ("redirect_uri", state.oauth.redirect_uri.as_str()),
-            ("grant_type", "authorization_code"),
-        ])
-        .send()
-        .await
-    {
-        Ok(r) => match r.json::<TokenResponse>().await {
+    let token_res: TokenResponse = {
+        let resp = match reqwest::Client::new()
+            .post(GOOGLE_TOKEN_URL)
+            .form(&[
+                ("code", params.code.as_str()),
+                ("client_id", state.oauth.client_id.as_str()),
+                ("client_secret", state.oauth.client_secret.as_str()),
+                ("redirect_uri", state.oauth.redirect_uri.as_str()),
+                ("grant_type", "authorization_code"),
+            ])
+            .send()
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => return (StatusCode::BAD_GATEWAY, format!("token request failed: {e}")).into_response(),
+        };
+
+        // Surface the real Google error instead of a generic decode failure
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return (StatusCode::BAD_GATEWAY, format!("Google token error {status}: {body}")).into_response();
+        }
+
+        match resp.json::<TokenResponse>().await {
             Ok(t) => t,
-            Err(e) => return (StatusCode::BAD_GATEWAY, e.to_string()).into_response(),
-        },
-        Err(e) => return (StatusCode::BAD_GATEWAY, e.to_string()).into_response(),
+            Err(e) => return (StatusCode::BAD_GATEWAY, format!("token decode failed: {e}")).into_response(),
+        }
     };
 
     // Decode user info directly from the id_token JWT payload —
