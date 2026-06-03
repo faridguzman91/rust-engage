@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { open } from "@tauri-apps/plugin-opener";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { SERVER_BASE } from "../config";
 
@@ -33,7 +33,7 @@ export const useAuthStore = defineStore("auth", () => {
 
   /** Open the system browser to start Google OAuth. */
   async function loginWithGoogle() {
-    await open(`${SERVER_BASE}/api/auth/google`);
+    await openUrl(`${SERVER_BASE}/api/auth/google`);
   }
 
   /**
