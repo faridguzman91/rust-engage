@@ -16,9 +16,7 @@ onMounted(async () => {
   document.documentElement.classList.add("dark");
 
   // Listen for the OAuth deep-link callback (engage://auth?token=...)
-  // This resolves if the app is opened via a deep-link during this session.
   auth.listenForDeepLink().then(() => {
-    // After token arrives, load identity and connect WS
     identity.initialize();
   });
 
@@ -71,7 +69,3 @@ onMounted(async () => {
   <Toast position="bottom-right" />
   <router-view />
 </template>
-
-<script>
-// auto-imported component registration not needed — imported below
-</script>

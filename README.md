@@ -165,19 +165,30 @@ engage/
 |---|---|---|
 | Rust | ≥ 1.96 | Install via [rustup](https://rustup.rs) |
 | Node.js | ≥ 18 | v19 also works (engine warnings are non-fatal) |
-| npm | ≥ 8 | Bundled with Node |
-| C linker | — | **Windows:** MinGW GCC via Scoop (`scoop install gcc`) or MSVC Build Tools. **macOS/Linux:** Xcode CLT / `build-essential` |
+| **pnpm** | **≥ 7** | **`scoop install pnpm` or `npm i -g pnpm`** — npm is not used |
+| C linker | — | **Windows:** see toolchain note below. **macOS/Linux:** Xcode CLT / `build-essential` |
 | engage-server | running | See [engage-server](https://github.com/faridguzman91/rust-engage/tree/engage-server) — requires Google OAuth credentials |
 
 ### Windows-specific toolchain note
 
-This project targets `x86_64-pc-windows-gnu` (set in `src-tauri/rust-toolchain.toml`) to avoid a dependency on the full Visual Studio Build Tools. MinGW's GCC acts as the linker.
+This project targets `x86_64-pc-windows-gnu`. Full Visual Studio Build Tools are **not** required. Instead:
+
+1. **GCC 14** (linker driver) + **LLD** (linker via `rust-lld`) are used.
+2. `rust-lld` is bundled with the Rust toolchain — no separate install.
+3. GCC 14 is needed to provide `libgcc`, `libmingwex`, etc.
 
 ```powershell
-scoop install gcc
+# Install GCC 14 via Scoop
+scoop install mingw        # GCC 14.2.0
+
+# Install the GNU Rust toolchain
 rustup toolchain install stable-x86_64-pc-windows-gnu
-rustup override set stable-x86_64-pc-windows-gnu  # run inside src-tauri/
+rustup override set stable-x86_64-pc-windows-gnu   # run inside src-tauri/
 ```
+
+The `.cargo/config.toml` at the repo root sets the linker to GCC 14 with `-fuse-ld=lld` automatically — no manual config needed after the above steps.
+
+> **Why not MSVC?** The MSVC Build Tools installer requires ~8 GB. GNU + LLD is a lighter alternative that works on Windows without a full Visual Studio installation.
 
 ---
 
@@ -211,13 +222,13 @@ cargo run
 ### 4. Install frontend dependencies
 
 ```bash
-npm install
+pnpm install
 ```
 
 ### 5. Run in development mode
 
 ```bash
-npm run tauri dev
+pnpm tauri dev
 ```
 
 Tauri starts the Vite dev server on `http://localhost:1420` and opens the native window.
@@ -305,7 +316,7 @@ After the first message both sides advance the Double Ratchet independently — 
 ## Building for production
 
 ```bash
-npm run tauri build
+pnpm tauri build
 ```
 
 Binaries are written to `src-tauri/target/release/bundle/`.
