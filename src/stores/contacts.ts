@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useServerApi } from "../composables/useServerApi";
+import { useOpkReplenishment } from "../composables/useOpkReplenishment";
 
 export interface Contact {
   id: string;
@@ -57,6 +58,10 @@ export const useContactsStore = defineStore("contacts", () => {
 
     // Store the ephemeral key so the first send can include it
     ephemeralKeys.value[contactId] = ek;
+
+    // One OPK was just consumed from the server pool — check if we need to replenish
+    useOpkReplenishment().checkAndReplenish();
+
     return ek;
   }
 

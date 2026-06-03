@@ -271,7 +271,7 @@ Binaries are written to `src-tauri/target/release/bundle/`.
 - [x] **Authentication** — Google OAuth 2.0 + HS256 JWT; all API routes and WebSocket connections are protected
 - [x] **Relay server** — zero-knowledge Axum server; stores and forwards sealed envelopes only
 - [x] **Offline message drain** — messages queued server-side while recipient is offline, delivered on reconnect
-- [ ] **OPK replenishment** — auto-upload fresh one-time prekeys when the server pool runs low
+- [x] **OPK replenishment** — auto-upload fresh one-time prekeys when the server pool runs low (watermark: 10, batch: 100)
 - [ ] **Disappearing messages** — per-conversation TTL; messages auto-delete on both sides after a set time
 - [ ] **Group messaging** — multi-party encrypted chat using Sender Keys (Signal-style)
 - [ ] **Voice / video** — WebRTC peer connections + TURN server for NAT traversal

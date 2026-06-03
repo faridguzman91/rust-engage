@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useMessagesStore } from "../stores/messages";
 import type { Message } from "../stores/messages";
 import { SERVER_WS } from "../config";
+import { useOpkReplenishment } from "./useOpkReplenishment";
 
 function getToken(): string {
   return localStorage.getItem("engage_jwt") ?? "";
@@ -37,6 +38,8 @@ export function useWebSocket() {
     socket.onopen = () => {
       status.value = "connected";
       retryDelay = 1000; // reset backoff on successful connect
+      // Check OPK pool every time we (re)connect — silent, non-blocking
+      useOpkReplenishment().checkAndReplenish();
     };
 
     socket.onmessage = async (event) => {

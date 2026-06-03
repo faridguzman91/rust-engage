@@ -70,5 +70,9 @@ export function useServerApi() {
     return request("GET", `/api/messages/${encodeURIComponent(userId)}`);
   }
 
-  return { register, fetchPreKeyBundle, uploadPreKeys, sendEnvelope, fetchPendingMessages };
+  async function fetchOpkCount(userId: string): Promise<{ remaining: number }> {
+    return request("GET", `/api/keys/${encodeURIComponent(userId)}/prekeys/count`);
+  }
+
+  return { register, fetchPreKeyBundle, uploadPreKeys, sendEnvelope, fetchPendingMessages, fetchOpkCount };
 }
