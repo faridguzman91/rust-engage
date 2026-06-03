@@ -211,6 +211,13 @@ pub async fn callback(
         let _ = db.execute("DELETE FROM oauth_states WHERE state=?1", params![params.state]);
     }
 
-    // Deep-link back into the Tauri app
-    Redirect::temporary(&format!("engage://auth?token={token}")).into_response()
+    // Redirect back to the app.
+    // In dev: FRONTEND_URL=http://localhost:1420 → browser navigates directly to the Vite server.
+    // In prod: leave FRONTEND_URL unset → use the engage:// deep-link protocol.
+    let redirect_url = match std::env::var("FRONTEND_URL") {
+        Ok(url) => format!("{url}/#/auth?token={token}"),
+        Err(_) => format!("engage://auth?token={token}"),
+    };
+
+    Redirect::temporary(&redirect_url).into_response()
 }
