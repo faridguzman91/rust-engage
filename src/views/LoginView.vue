@@ -1,29 +1,18 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import Card from "primevue/card";
 import Button from "primevue/button";
-import Message from "primevue/message";
 
-const router = useRouter();
 const auth = useAuthStore();
 const loading = ref(false);
-const error = ref("");
 
-async function login() {
+function login() {
   loading.value = true;
-  error.value = "";
-  try {
-    // Opens the system browser to start Google OAuth.
-    // The server will redirect back to http://localhost:1420/#/auth?token=JWT (dev)
-    // or engage://auth?token=JWT (production), which the router handles.
-    await auth.loginWithGoogle();
-    // Keep loading=true — the browser will bring the user back via the /auth route
-  } catch (e) {
-    error.value = String(e);
-    loading.value = false;
-  }
+  // Navigate the Tauri webview through Google OAuth.
+  // The server redirects back to localhost:1420/#/auth?token=JWT so we
+  // return to the app inside Tauri with __TAURI_INTERNALS__ available.
+  auth.loginWithGoogle();
 }
 </script>
 
@@ -55,8 +44,6 @@ async function login() {
               </svg>
             </template>
           </Button>
-
-          <Message v-if="error" severity="error" :closable="false">{{ error }}</Message>
 
           <p class="hint">
             Your messages are encrypted on your device.<br />
