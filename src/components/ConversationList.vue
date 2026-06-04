@@ -131,7 +131,7 @@ function avatarLabel(name: string) {
   <div class="conv-list">
     <!-- Header -->
     <div class="conv-header">
-      <span class="brand">engage</span>
+      <img src="/engage.svg" alt="engage" class="brand-logo" />
       <div class="header-actions">
         <Button
           icon="pi pi-pencil"
@@ -360,7 +360,7 @@ function avatarLabel(name: string) {
 <style scoped>
 .conv-list { display:flex; flex-direction:column; height:100%; background:var(--engage-sidebar-bg); overflow:hidden; }
 .conv-header { display:flex; align-items:center; justify-content:space-between; padding:0.85rem 1rem; flex-shrink:0; }
-.brand { font-weight:800; font-size:1.15rem; color:var(--engage-accent); letter-spacing:-0.02em; }
+.brand-logo { height: 28px; width: auto; }
 .header-actions { display:flex; gap:0.25rem; }
 .self-row { display:flex; align-items:center; gap:0.75rem; padding:0.6rem 1rem; flex-shrink:0; }
 .self-info { display:flex; flex-direction:column; min-width:0; }

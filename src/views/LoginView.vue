@@ -21,7 +21,7 @@ function login() {
     <Card class="login-card">
       <template #content>
         <div class="login-body">
-          <img src="/engage.png" alt="engage" class="logo" />
+          <img src="/engage.svg" alt="engage" class="logo" />
 
           <div class="text-center">
             <p class="tagline">End-to-end encrypted messaging</p>
@@ -76,7 +76,7 @@ function login() {
   gap: 1.25rem;
   padding: 0.5rem 0;
 }
-.logo { width: 200px; }
+.logo { width: 240px; }
 .tagline { color: var(--engage-muted); font-size: 0.9rem; margin: 0; }
 .google-btn {
   width: 100%;
