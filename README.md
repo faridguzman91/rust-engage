@@ -501,5 +501,58 @@ For production: use HTTPS, remove `FRONTEND_URL` (uses `engage://` deep-link), r
 - [x] **Disappearing messages** — per-conversation TTL; messages auto-delete on both sides after a set time
 - [x] **Group messaging** — Sender Keys (Signal-style); one encrypt per message, server fans out to all members
 - [x] **Gmail contact import** — "Find from Gmail" discovers which contacts are on engage via Google People API
-- [ ] **Voice / video** — WebRTC peer connections + TURN server for NAT traversal
-- [ ] **Mobile** — Tauri Android / iOS build target
+
+### Message Sending — Reliability & Status
+
+- [ ] **Delivery receipts** — server emits `ack` on relay; client marks `sent → delivered`
+- [ ] **Read receipts** — client emits `read` event when message scrolls into view; persist `read_at` in SQLite
+- [ ] **Retry queue** — outbound messages queued in SQLite `pending_messages` when WS is offline, drained on reconnect
+- [ ] **Message ordering** — add `sequence_num` per conversation; detect gaps and re-request missing messages
+
+### Invites
+
+- [ ] **Invite links** — server generates short-lived signed token at `/invite/:token`; client handles via `engage://invite/:token` deep link
+- [ ] **QR code** — render identity key + invite URL as QR in settings (frontend only, no server changes)
+- [ ] **Share sheet** — Tauri shell `open` with `mailto:` / `sms:` URI to share invite link
+
+### Android Port
+
+- [ ] Add Rust targets: `aarch64-linux-android`, `armv7-linux-androideabi`
+- [ ] Install Android SDK/NDK; set `ANDROID_HOME`, `NDK_HOME`
+- [ ] Run `pnpm tauri android init` to generate `src-tauri/gen/android/`
+- [ ] Fix `cdylib` crate type: add conditional feature flag (currently excluded for Windows PE limit)
+- [ ] OAuth redirect: replace `engage://` with Android App Link (`https://engage.app/auth`)
+- [ ] SQLite path: use `app_data_dir()` from `tauri::api::path`
+- [ ] CI: GitHub Actions `ubuntu-latest` + `java-setup-sdk` + `cargo ndk`
+
+### iOS Port
+
+- [ ] Add Rust targets: `aarch64-apple-ios`, `x86_64-apple-ios`, `aarch64-apple-ios-sim`
+- [ ] Run `pnpm tauri ios init` to generate Xcode project under `src-tauri/gen/ios/`
+- [ ] OAuth: `engage://` custom URL scheme registered in `Info.plist` (reuses macOS config)
+- [ ] Keychain: replace `localStorage` JWT storage with Tauri `stronghold` or `keychain` plugin
+- [ ] SQLite path: same `app_data_dir()` fix as Android
+- [ ] Provisioning: Apple Developer account, bundle ID `app.engage.client`
+- [ ] CI: `macos-latest` runner + `xcode-select`
+
+### Voice / Video Calls (STUN/TURN NAT Traversal)
+
+- [ ] **WS signaling messages** — add `CallOffer`, `CallAnswer`, `IceCandidate`, `CallHangup` types in `src/routes/ws.rs`; route through existing fan-out
+- [ ] **`useWebRTC.ts` composable** — `RTCPeerConnection`, ICE gathering, offer/answer exchange over WS
+- [ ] **`CallView.vue`** — incoming call dialog, `<video>` elements, mute/hang-up controls
+- [ ] **Wire up call buttons** — connect `pi-phone` / `pi-video` in `MessageThread.vue` header (currently rendered but no-op)
+- [ ] **STUN** — use `stun:stun.l.google.com:19302` for development
+- [ ] **TURN server** — deploy `coturn` on VPS (`lt-cred-mechanism`, `realm=engage.app`)
+- [ ] **Short-lived TURN credentials** — server endpoint `/api/turn-credentials` issues HMAC-SHA1 tokens (24h TTL); add `TURN_SECRET` env var
+- [ ] **Media E2EE** — layer AES-GCM insertable streams on top of mandatory DTLS-SRTP for full end-to-end encrypted media
+
+### Microservices Decomposition
+
+- [ ] **`auth-svc`** — extract Google OAuth, JWT issue/verify, token refresh from monolith
+- [ ] **`key-svc`** — extract identity key storage, OPK distribution, prekey bundle endpoints; migrate to Postgres
+- [ ] **`relay-svc`** — extract message store-and-forward and offline queue; back with Redis queue
+- [ ] **`ws-svc`** — extract WebSocket connections, push delivery, presence; use Redis pub/sub for cross-instance delivery
+- [ ] **`group-svc`** — extract group CRUD, Sender Key distribution, and fan-out logic
+- [ ] **`turn-svc`** — minimal service for TURN credential issuance
+- [ ] **API gateway** — JWT auth middleware + service routing (nginx or Axum tower layer)
+- [ ] **Migration path** — extract `auth-svc` first (cleanest boundary), then `key-svc`, then `relay-svc` + `ws-svc` together
