@@ -211,11 +211,30 @@ See the step-by-step instructions below.
 
 | Tool | Version | Notes |
 |---|---|---|
-| Rust | ≥ 1.96 | Install via [rustup](https://rustup.rs) |
-| Node.js | ≥ 18 | v19 also works (engine warnings are non-fatal) |
-| **pnpm** | **≥ 7** | **`scoop install pnpm`** — npm is not used |
+| Rust | ≥ 1.76 | Install via [rustup](https://rustup.rs) |
+| Node.js | ≥ 18.12 | Recommend Node 22 LTS via [nvm](https://github.com/nvm-sh/nvm) |
+| **pnpm** | **≥ 9** | See platform notes below — npm is not used |
 | Docker | 24+ | Only for `make docker-up` |
-| C linker | — | **Windows:** see toolchain note below. **macOS/Linux:** Xcode CLT / `build-essential` |
+| C linker | — | **macOS:** Xcode CLT · **Windows:** see toolchain note below · **Linux:** `build-essential` |
+
+### macOS toolchain note
+
+```bash
+# 1. Xcode Command Line Tools (provides clang + linker)
+xcode-select --install
+
+# 2. Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+
+# 3. Node.js 22 via nvm (recommended)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+nvm install 22 && nvm use 22
+
+# 4. pnpm via corepack (bundled with Node)
+corepack enable
+corepack prepare pnpm@9.15.9 --activate
+```
 
 ### Windows-specific toolchain note
 
@@ -227,6 +246,9 @@ This project targets `x86_64-pc-windows-gnu`. Full Visual Studio Build Tools are
 
 ```powershell
 scoop install mingw          # GCC 14.2.0
+scoop install nodejs-lts     # Node 22 LTS
+corepack enable
+corepack prepare pnpm@9.15.9 --activate
 rustup toolchain install stable-x86_64-pc-windows-gnu
 rustup override set stable-x86_64-pc-windows-gnu   # run inside src-tauri/
 ```
