@@ -46,7 +46,8 @@ pub async fn start(State(state): State<AppState>) -> impl IntoResponse {
 
     let url = format!(
         "{GOOGLE_AUTH_URL}?client_id={}&redirect_uri={}&response_type=code\
-         &scope=openid%20email%20profile&state={}&access_type=offline&prompt=consent",
+         &scope=openid%20email%20profile%20https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcontacts.readonly\
+         &state={}&access_type=offline&prompt=consent",
         urlencoding::encode(&state.oauth.client_id),
         urlencoding::encode(&state.oauth.redirect_uri),
         csrf_state,
