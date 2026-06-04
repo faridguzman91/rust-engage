@@ -1,0 +1,66 @@
+/* ── Engage design tokens (override PrimeVue Aura defaults) ─────────────── */
+:root {
+  --engage-accent:     #3ebf8c;   /* Signal-green */
+  --engage-accent-dim: #2fa678;
+  --engage-sent-bg:    #3ebf8c;
+  --engage-sent-fg:    #ffffff;
+  --engage-recv-bg:    #2a2a3c;
+  --engage-recv-fg:    #e8eaf6;
+
+  /* Sidebar */
+  --engage-sidebar-bg: #1e1e2e;
+  --engage-sidebar-hover: #2a2a3c;
+  --engage-sidebar-active: #2d3a4a;
+
+  /* Main */
+  --engage-main-bg:   #12121c;
+  --engage-header-bg: #1a1a2a;
+  --engage-border:    rgba(255,255,255,0.07);
+  --engage-input-bg:  #2a2a3c;
+  --engage-text:      #e8eaf6;
+  --engage-muted:     #8892b0;
+}
+
+/* ── Apply dark theme by default (desktop chat apps are dark) ─────────── */
+html { color-scheme: dark; }
+
+body {
+  margin: 0;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  background: var(--engage-main-bg);
+  color: var(--engage-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+#app { height: 100vh; overflow: hidden; }
+
+/* ── PrimeVue surface / primary overrides ───────────────────────────────── */
+.dark {
+  --p-surface-0:    #12121c;
+  --p-surface-50:   #1a1a2a;
+  --p-surface-100:  #1e1e2e;
+  --p-surface-200:  #2a2a3c;
+  --p-surface-300:  #363650;
+  --p-surface-400:  #4a4a64;
+  --p-surface-600:  #8892b0;
+  --p-surface-700:  #aab0c8;
+  --p-surface-800:  #c8cde0;
+  --p-surface-900:  #e8eaf6;
+  --p-surface-950:  #f4f5fb;
+  --p-primary-color:         #3ebf8c;
+  --p-primary-hover-color:   #2fa678;
+  --p-primary-active-color:  #27956a;
+  --p-primary-contrast-color:#ffffff;
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--engage-border); border-radius: 4px; }
+
+/* ── Utility ────────────────────────────────────────────────────────────── */
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
