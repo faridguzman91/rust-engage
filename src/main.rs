@@ -80,6 +80,9 @@ async fn main() {
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     tracing::info!("engage-server listening on {addr}");
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap_or_else(|e| {
+        tracing::error!("failed to bind to {addr}: {e} — port {port} already in use. Kill the existing process with: lsof -ti:{port} | xargs kill");
+        std::process::exit(1);
+    });
     axum::serve(listener, app).await.unwrap();
 }
