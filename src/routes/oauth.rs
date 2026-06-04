@@ -64,9 +64,10 @@ pub struct CallbackParams {
 
 #[derive(Deserialize)]
 struct TokenResponse {
-    #[allow(dead_code)]
-    access_token: String,   // kept for future use (e.g. calling other Google APIs)
+    access_token: String,
     id_token: String,
+    refresh_token: Option<String>,
+    expires_in: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -198,6 +199,27 @@ pub async fn callback(
             uid
         }
     };
+
+    // Store the Google tokens so the contacts-suggest endpoint can call People API
+    {
+        let db = state.db.lock().unwrap();
+        let expires_at = Utc::now().timestamp()
+            + token_res.expires_in.unwrap_or(3600) as i64;
+
+        if let Some(ref refresh) = token_res.refresh_token {
+            // First consent — we have a refresh token; store everything
+            let _ = db.execute(
+                "UPDATE oauth_accounts SET access_token=?1, refresh_token=?2, token_expires_at=?3 WHERE user_id=?4",
+                params![token_res.access_token, refresh, expires_at, user_id],
+            );
+        } else {
+            // Subsequent login — Google doesn't re-issue refresh token; update access + expiry only
+            let _ = db.execute(
+                "UPDATE oauth_accounts SET access_token=?1, token_expires_at=?2 WHERE user_id=?3",
+                params![token_res.access_token, expires_at, user_id],
+            );
+        }
+    }
 
     // Issue JWT
     let token = match issue_jwt(&state.oauth.jwt_secret, &user_id, &user.email) {

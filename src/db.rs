@@ -48,9 +48,12 @@ fn migrate(conn: &Connection) -> Result<()> {
 
         -- Google OAuth: maps google_sub → user_id (set after first OAuth login)
         CREATE TABLE IF NOT EXISTS oauth_accounts (
-            google_sub  TEXT PRIMARY KEY,
-            user_id     TEXT NOT NULL REFERENCES devices(user_id),
-            email       TEXT NOT NULL
+            google_sub       TEXT PRIMARY KEY,
+            user_id          TEXT NOT NULL REFERENCES devices(user_id),
+            email            TEXT NOT NULL,
+            access_token     TEXT NOT NULL DEFAULT '',
+            refresh_token    TEXT NOT NULL DEFAULT '',
+            token_expires_at INTEGER NOT NULL DEFAULT 0
         );
 
         -- Short-lived CSRF state tokens for the OAuth flow
@@ -85,6 +88,9 @@ fn migrate(conn: &Connection) -> Result<()> {
     // @faridguzman91: Additive migration — add group_id to messages so group fan-out
     // rows can be distinguished from 1:1 messages on the client side.
     add_column_if_missing(conn, "messages", "group_id", "TEXT")?;
+    add_column_if_missing(conn, "oauth_accounts", "access_token", "TEXT NOT NULL DEFAULT ''")?;
+    add_column_if_missing(conn, "oauth_accounts", "refresh_token", "TEXT NOT NULL DEFAULT ''")?;
+    add_column_if_missing(conn, "oauth_accounts", "token_expires_at", "INTEGER NOT NULL DEFAULT 0")?;
 
     Ok(())
 }
