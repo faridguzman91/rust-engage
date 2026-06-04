@@ -51,22 +51,25 @@ struct RefreshResponse {
 async fn call_people_api(
     client: &reqwest::Client,
     access_token: &str,
-) -> Result<Vec<String>, StatusCode> {
+) -> Result<Vec<String>, (StatusCode, String)> {
     let resp = client
         .get(PEOPLE_API)
         .bearer_auth(access_token)
         .send()
         .await
-        .map_err(|_| StatusCode::BAD_GATEWAY)?;
+        .map_err(|e| (StatusCode::BAD_GATEWAY, e.to_string()))?;
 
     if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
-        return Err(StatusCode::UNAUTHORIZED);
+        return Err((StatusCode::UNAUTHORIZED, String::new()));
     }
     if !resp.status().is_success() {
-        return Err(StatusCode::BAD_GATEWAY);
+        let status = resp.status().as_u16();
+        let body = resp.text().await.unwrap_or_default();
+        tracing::warn!("People API error {status}: {body}");
+        return Err((StatusCode::BAD_GATEWAY, format!("People API {status}: {body}")));
     }
 
-    let body: PeopleResponse = resp.json().await.map_err(|_| StatusCode::BAD_GATEWAY)?;
+    let body: PeopleResponse = resp.json().await.map_err(|e| (StatusCode::BAD_GATEWAY, e.to_string()))?;
     let emails = body
         .connections
         .unwrap_or_default()
@@ -145,11 +148,11 @@ pub async fn suggest(
     };
 
     // Fetch the caller's Gmail contact email addresses
-    let emails = call_people_api(&client, &active_token).await.map_err(|s| {
+    let emails = call_people_api(&client, &active_token).await.map_err(|(s, msg)| {
         if s == StatusCode::UNAUTHORIZED {
             (StatusCode::FORBIDDEN, "re-authentication required".into())
         } else {
-            (s, "Google People API error".into())
+            (s, msg)
         }
     })?;
 
