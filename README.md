@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="engage.png" alt="engage" width="480" />
+  <img src="engage.svg" alt="engage" width="480" />
 </p>
 
 ---
