@@ -236,6 +236,18 @@ corepack enable
 corepack prepare pnpm@9.15.9 --activate
 ```
 
+#### macOS-specific gotchas
+
+**`._*` resource fork files** — macOS generates hidden `._*` metadata files on volumes that don't support HFS+ extended attributes (e.g. exFAT external drives). If you clone onto such a volume, delete them before building:
+
+```bash
+find . -name "._*" -delete
+```
+
+They are listed in `.gitignore` so they won't be tracked. The `Makefile` also sets `CARGO_TARGET_DIR=$HOME/.cargo-targets/engage` to keep all Rust build output on local disk, preventing the issue from recurring in the build cache.
+
+**Deep link scheme** — `tauri-plugin-deep-link` does not support runtime `register()` on macOS. The `engage://` URL scheme is declared statically in the app bundle via `tauri.conf.json` → `Info.plist`. No action required; this is handled automatically.
+
 ### Windows-specific toolchain note
 
 This project targets `x86_64-pc-windows-gnu`. Full Visual Studio Build Tools are **not** required:
