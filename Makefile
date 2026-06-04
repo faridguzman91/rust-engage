@@ -11,11 +11,20 @@
 #   make docker-down — stop Docker Compose services
 #   make clean      — remove build artefacts
 
+SHELL       := /bin/bash
 SERVER_DIR  := ../engage-server
 PNPM        := pnpm
-# Build on local disk — avoids macOS ._* resource-fork files on the Transcend volume
+
+# Build on local disk — avoids macOS ._* resource-fork files on external volumes
 CARGO_TARGET_DIR := $(HOME)/.cargo-targets/engage
 export CARGO_TARGET_DIR
+
+# If nvm is present, prepend the latest Node 22 bin dir so make doesn't fall
+# back to the system Node (which may be too old for pnpm 9).
+NVM_NODE22 := $(shell ls -d $(HOME)/.nvm/versions/node/v22.* 2>/dev/null | sort -V | tail -1)
+ifneq ($(NVM_NODE22),)
+  export PATH := $(NVM_NODE22)/bin:$(PATH)
+endif
 
 .PHONY: dev server client install build docker-up docker-down clean help
 
