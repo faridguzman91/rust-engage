@@ -28,10 +28,10 @@ pub fn run() {
             let conn = storage::db::open(&db_path).expect("failed to open database");
             app.manage(AppState { db: Mutex::new(conn) });
 
-            // @faridguzman91: Register the engage:// URI scheme so Windows routes
-            // OAuth deep-link callbacks to this app in production builds.
-            // In dev mode the server uses FRONTEND_URL=http://localhost:1420 instead.
-            #[cfg(desktop)]
+            // Register the engage:// URI scheme at runtime on Windows/Linux.
+            // On macOS the scheme is declared in Info.plist via tauri.conf.json and
+            // does not support runtime registration (returns "unsupported platform").
+            #[cfg(all(desktop, not(target_os = "macos")))]
             app.deep_link().register("engage")?;
 
             Ok(())
