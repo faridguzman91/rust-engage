@@ -4,6 +4,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useContactsStore } from "../stores/contacts";
 import { useIdentityStore } from "../stores/identity";
 import { useGroupsStore } from "../stores/groups";
+import { useServerApi, type ContactSuggestion } from "../composables/useServerApi";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
 import Dialog from "primevue/dialog";
@@ -22,6 +23,7 @@ const route = useRoute();
 const contacts = useContactsStore();
 const identity = useIdentityStore();
 const groups = useGroupsStore();
+const api = useServerApi();
 
 // @faridguzman91: Contact dialog
 const showContactDialog = ref(false);
@@ -29,6 +31,45 @@ const newContactKey = ref("");
 const newContactName = ref("");
 const addError = ref("");
 const adding = ref(false);
+
+// Gmail contact import
+const showGmailDialog = ref(false);
+const gmailSuggestions = ref<ContactSuggestion[]>([]);
+const gmailLoading = ref(false);
+const gmailError = ref("");
+const addingId = ref<string | null>(null);
+
+async function openGmailImport() {
+  showGmailDialog.value = true;
+  gmailError.value = "";
+  gmailSuggestions.value = [];
+  gmailLoading.value = true;
+  try {
+    const all = await api.suggestContacts();
+    // Filter out contacts already added
+    const existingIds = new Set(contacts.contacts.map((c) => c.id));
+    gmailSuggestions.value = all.filter((s) => !existingIds.has(s.userId));
+  } catch (e: any) {
+    if (String(e).includes("403") || String(e).includes("re-authentication")) {
+      gmailError.value = "Please sign out and sign in again to enable Gmail import.";
+    } else {
+      gmailError.value = String(e);
+    }
+  } finally {
+    gmailLoading.value = false;
+  }
+}
+
+async function addSuggested(suggestion: ContactSuggestion) {
+  addingId.value = suggestion.userId;
+  try {
+    const contact = await contacts.addContact(suggestion.identityKey, suggestion.displayName);
+    gmailSuggestions.value = gmailSuggestions.value.filter((s) => s.userId !== suggestion.userId);
+    router.push(`/chat/${contact.id}`);
+  } finally {
+    addingId.value = null;
+  }
+}
 
 // @faridguzman91: Group dialog
 const showGroupDialog = ref(false);
@@ -97,6 +138,12 @@ function avatarLabel(name: string) {
           text rounded size="small"
           v-tooltip.bottom="'New conversation'"
           @click="showContactDialog = true"
+        />
+        <Button
+          icon="pi pi-google"
+          text rounded size="small"
+          v-tooltip.bottom="'Find from Gmail'"
+          @click="openGmailImport"
         />
         <Button
           icon="pi pi-users"
@@ -223,6 +270,46 @@ function avatarLabel(name: string) {
     </template>
   </Dialog>
 
+  <!-- Gmail import dialog -->
+  <Dialog
+    v-model:visible="showGmailDialog"
+    header="Find from Gmail"
+    :style="{ width: '400px' }"
+    :modal="true"
+    :draggable="false"
+  >
+    <div class="dialog-body">
+      <div v-if="gmailLoading" class="gmail-loading">
+        <i class="pi pi-spin pi-spinner" style="font-size:1.5rem; color:var(--engage-accent);" />
+        <span>Checking your Gmail contacts…</span>
+      </div>
+      <Message v-else-if="gmailError" severity="warn" :closable="false">{{ gmailError }}</Message>
+      <div v-else-if="gmailSuggestions.length === 0" class="no-items" style="padding:1.5rem 0;">
+        <i class="pi pi-users" style="font-size:1.5rem; opacity:0.3;" />
+        <p>No Gmail contacts are on engage yet.</p>
+      </div>
+      <div v-else class="suggestion-list">
+        <div v-for="s in gmailSuggestions" :key="s.userId" class="suggestion-row">
+          <Avatar
+            :label="s.displayName[0]?.toUpperCase() ?? '?'"
+            shape="circle" size="normal"
+            style="background:#4a4a78;color:#e8eaf6;font-weight:600;flex-shrink:0;"
+          />
+          <div class="suggestion-info">
+            <span class="contact-name">{{ s.displayName }}</span>
+            <span class="contact-sub">{{ s.email }}</span>
+          </div>
+          <Button
+            label="Add"
+            size="small"
+            :loading="addingId === s.userId"
+            @click="addSuggested(s)"
+          />
+        </div>
+      </div>
+    </div>
+  </Dialog>
+
   <!-- New group dialog -->
   <Dialog
     v-model:visible="showGroupDialog"
@@ -303,4 +390,9 @@ function avatarLabel(name: string) {
 .member-pick-row:hover { background:var(--engage-sidebar-hover); }
 .member-pick-row.selected { background:var(--engage-sidebar-active); }
 .member-pick-name { font-size:0.88rem; color:var(--engage-text); }
+
+.gmail-loading { display:flex; align-items:center; gap:0.75rem; padding:1rem 0; color:var(--engage-muted); font-size:0.9rem; }
+.suggestion-list { display:flex; flex-direction:column; gap:0.25rem; max-height:320px; overflow-y:auto; }
+.suggestion-row { display:flex; align-items:center; gap:0.75rem; padding:0.5rem 0.25rem; }
+.suggestion-info { display:flex; flex-direction:column; flex:1; min-width:0; }
 </style>

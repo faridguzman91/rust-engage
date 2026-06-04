@@ -53,6 +53,13 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   return res.json();
 }
 
+export interface ContactSuggestion {
+  userId: string;
+  displayName: string;
+  identityKey: string;
+  email: string;
+}
+
 export function useServerApi() {
   // @faridguzman91: Register uploads public crypto keys after first identity creation.
   // The server derives user_id from the JWT — the body cannot override it.
@@ -119,8 +126,13 @@ export function useServerApi() {
     });
   }
 
+  async function suggestContacts(): Promise<ContactSuggestion[]> {
+    return request("GET", "/api/contacts/suggest");
+  }
+
   return {
     register, fetchPreKeyBundle, uploadPreKeys, sendEnvelope, fetchPendingMessages, fetchOpkCount,
     createGroup, listGroups, getGroup, addGroupMember, removeGroupMember, sendGroupEnvelope,
+    suggestContacts,
   };
 }
