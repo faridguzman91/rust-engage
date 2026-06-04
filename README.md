@@ -6,6 +6,10 @@
 
 End-to-end encrypted desktop chat — built with Tauri 2, Vue 3, and Rust.
 
+<p align="center">
+  <img src="screenshot.png" alt="engage login screen" width="640" />
+</p>
+
 Messages are encrypted on your device before leaving it. The relay server forwards sealed envelopes and never has access to plaintext. Identity is verified via Google OAuth; sessions are authenticated with JWTs.
 
 > **Author:** [@faridguzman91](https://github.com/faridguzman91)
