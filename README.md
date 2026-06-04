@@ -280,12 +280,36 @@ git clone git@github.com:faridguzman91/rust-engage.git
 cd rust-engage
 ```
 
-### 2. Set up Google OAuth credentials
+### 2. Set up Google credentials
+
+#### OAuth 2.0 client
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials**
 2. Create an **OAuth 2.0 Client ID** — application type: **Web application**
 3. Add `http://localhost:3000/api/auth/google/callback` to **Authorized redirect URIs**
 4. Copy the client ID and secret into the server's `.env` file
+
+#### Enable required APIs
+
+In **APIs & Services → Library**, enable both:
+
+| API | Used for |
+|---|---|
+| **Google People API** | Gmail contact import (`Find from Gmail` feature) |
+| **Google Identity** | Already enabled when you create an OAuth client |
+
+#### OAuth consent screen scopes
+
+In **APIs & Services → OAuth consent screen → Edit App → Scopes**, add:
+
+| Scope | Purpose |
+|---|---|
+| `openid` | Identity token |
+| `email` | Login identity |
+| `profile` | Display name |
+| `https://www.googleapis.com/auth/contacts.readonly` | Read Gmail contacts for the import feature |
+
+> If your app is in **Testing** mode, add your Google account under **Test users**.
 
 ### 3. Configure and start the relay server
 
@@ -382,7 +406,8 @@ Bob receives:
 Tauri webview                   Server                    Google
 ─────────────                   ──────                    ──────
 window.location.href ─────────► GET /api/auth/google ──► OAuth consent
-                                POST token exchange  ──► Google id_token
+                                POST token exchange  ──► Google id_token + access_token
+                                Store access_token, refresh_token in DB
                                 issue HS256 JWT
 Dev:  redirect ◄─────────────── localhost:1420/#/auth?token=JWT
 Prod: redirect ◄─────────────── engage://auth?token=JWT
@@ -390,6 +415,31 @@ JWT stored in localStorage
 All requests: Authorization: Bearer JWT
 WS: /ws/:userId?token=JWT
 ```
+
+---
+
+## Gmail contact import flow
+
+The **Find from Gmail** button (Google icon in the sidebar header) discovers which of your existing Gmail contacts are already on engage.
+
+```
+Client (JWT)                    Server                         Google
+────────────                    ──────                         ──────
+GET /api/contacts/suggest ────► Load access_token from DB
+                                If expired → POST token refresh ──► new access_token
+                                GET people/me/connections ────────► email addresses
+                                SELECT users WHERE email IN (...)
+                                (excludes self, excludes unregistered)
+                         ◄───── [{ userId, displayName, identityKey, email }]
+Show suggestions dialog
+  └─► user clicks "Add"
+        └─► addContact(identityKey, displayName)
+              └─► X3DH session init on next message
+```
+
+**Token lifecycle** — The server stores the Google `access_token` and `refresh_token` from the OAuth exchange. Access tokens expire after 1 hour; the server refreshes automatically using the stored refresh token. If the refresh token is missing or revoked, the feature returns a "re-authentication required" message and the user signs out and back in.
+
+**Privacy** — The server only reads email addresses from the People API, cross-references them against its own `oauth_accounts` table, and discards the rest. No contact data is stored.
 
 ---
 
@@ -450,5 +500,6 @@ For production: use HTTPS, remove `FRONTEND_URL` (uses `engage://` deep-link), r
 - [x] **PrimeVue UI** — Signal-inspired dark theme built with PrimeVue 4 + Aura preset + PrimeIcons
 - [x] **Disappearing messages** — per-conversation TTL; messages auto-delete on both sides after a set time
 - [x] **Group messaging** — Sender Keys (Signal-style); one encrypt per message, server fans out to all members
+- [x] **Gmail contact import** — "Find from Gmail" discovers which contacts are on engage via Google People API
 - [ ] **Voice / video** — WebRTC peer connections + TURN server for NAT traversal
 - [ ] **Mobile** — Tauri Android / iOS build target
