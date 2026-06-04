@@ -11,8 +11,11 @@
 #   make docker-down — stop Docker Compose services
 #   make clean      — remove build artefacts
 
-SERVER_DIR := ../engage-server
-PNPM       := pnpm
+SERVER_DIR  := ../engage-server
+PNPM        := pnpm
+# Build on local disk — avoids macOS ._* resource-fork files on the Transcend volume
+CARGO_TARGET_DIR := $(HOME)/.cargo-targets/engage
+export CARGO_TARGET_DIR
 
 .PHONY: dev server client install build docker-up docker-down clean help
 
@@ -54,7 +57,7 @@ docker-down:
 clean:
 	cargo clean --manifest-path src-tauri/Cargo.toml
 	cargo clean --manifest-path $(SERVER_DIR)/Cargo.toml
-	rm -rf dist node_modules
+	rm -rf dist node_modules $(CARGO_TARGET_DIR)
 
 help:
 	@grep -E '^##' Makefile | sed 's/## /  /'
