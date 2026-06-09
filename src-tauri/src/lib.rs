@@ -44,6 +44,7 @@ pub fn run() {
             commands::contacts::remove_contact,
             commands::messages::list_messages,
             commands::messages::send_message,
+            commands::messages::update_message_status,
             commands::crypto::generate_prekey_bundle,
             commands::crypto::encrypt_message,
             commands::crypto::decrypt_message,

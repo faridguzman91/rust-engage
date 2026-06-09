@@ -127,3 +127,25 @@ pub fn send_message(
 
     Ok(msg)
 }
+
+/// Update the delivery status of a locally-stored message.
+/// Called by the WS handler when the server forwards an ack (→ "delivered")
+/// or a read receipt (→ "read") back to the original sender.
+#[tauri::command]
+pub fn update_message_status(
+    message_id: String,
+    status: String,
+    state: State<AppState>,
+) -> Result<(), String> {
+    // Guard against unexpected status strings reaching the DB
+    if !matches!(status.as_str(), "sending" | "sent" | "delivered" | "read" | "failed") {
+        return Err(format!("unknown status: {status}"));
+    }
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.execute(
+        "UPDATE messages SET status=?1 WHERE id=?2 AND is_mine=1",
+        params![status, message_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}

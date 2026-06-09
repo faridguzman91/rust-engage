@@ -59,6 +59,23 @@ export function useWebSocket() {
         return;
       }
 
+      // ── Delivery receipt — server forwarded recipient's ACK back to us ──────
+      if (envelope.type === "ack") {
+        const { message_id } = envelope as unknown as { message_id: string };
+        messagesStore.updateStatus(message_id, "delivered");
+        // Persist the new status to local SQLite so it survives a restart
+        invoke("update_message_status", { messageId: message_id, status: "delivered" }).catch(() => {});
+        return;
+      }
+
+      // ── Read receipt — recipient opened the conversation ──────────────────
+      if (envelope.type === "read") {
+        const { message_id } = envelope as unknown as { message_id: string };
+        messagesStore.updateStatus(message_id, "read");
+        invoke("update_message_status", { messageId: message_id, status: "read" }).catch(() => {});
+        return;
+      }
+
       if (envelope.type === "message") {
         const raw = envelope.payload as {
           id: string;
@@ -189,5 +206,18 @@ export function useWebSocket() {
     }
   }
 
-  return { status, connect, disconnect, send };
+  // @faridguzman91: Emit "read" receipts for every received message in a
+  // conversation. Called when the user opens a thread (and on each new
+  // incoming message while the thread is visible). The server looks up the
+  // original sender and forwards a WsEnvelope::Read to them.
+  function markRead(conversationId: string) {
+    const msgs = messagesStore.forConversation(conversationId);
+    for (const msg of msgs) {
+      if (!msg.isMine && msg.status !== "read") {
+        send({ type: "read", messageId: msg.id });
+      }
+    }
+  }
+
+  return { status, connect, disconnect, send, markRead };
 }

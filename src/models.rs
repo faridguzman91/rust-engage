@@ -141,6 +141,19 @@ pub struct GroupStoredMessage {
 pub enum WsEnvelope {
     Message { payload: StoredMessage },
     GroupMessage { payload: GroupStoredMessage },
+    /// Forwarded to the original sender when the recipient's client ACKs delivery.
     Ack { message_id: String },
+    /// Forwarded to the original sender when the recipient opens and reads the message.
+    Read { message_id: String },
     Error { code: String, message: String },
+}
+
+/// Frame sent by a connected client over the WebSocket (client → server direction).
+#[derive(Debug, Deserialize)]
+pub struct ClientFrame {
+    #[serde(rename = "type")]
+    pub kind: String,
+    /// camelCase to match the JS side
+    #[serde(rename = "messageId")]
+    pub message_id: String,
 }

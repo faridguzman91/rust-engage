@@ -105,6 +105,20 @@ export const useMessagesStore = defineStore("messages", () => {
     });
   }
 
+  // @faridguzman91: Update the delivery status of a sent message in-memory.
+  // Called by the WS handler when the server forwards an ack (delivered) or
+  // read receipt back to us. We scan all conversations since the WS envelope
+  // only carries the message ID, not the conversation ID.
+  function updateStatus(messageId: string, status: Message["status"]) {
+    for (const msgs of Object.values(byConversation.value)) {
+      const msg = msgs.find((m) => m.id === messageId);
+      if (msg) {
+        msg.status = status;
+        return;
+      }
+    }
+  }
+
   // @faridguzman91: Remove a single message from the in-memory store.
   // Called by useDisappearingMessages when a timer fires.
   // DB deletion is handled separately by sweep_expired_messages.
@@ -119,5 +133,5 @@ export const useMessagesStore = defineStore("messages", () => {
     return byConversation.value[id] ?? [];
   }
 
-  return { byConversation, load, send, sendControl, append, remove, forConversation };
+  return { byConversation, load, send, sendControl, append, remove, forConversation, updateStatus };
 });

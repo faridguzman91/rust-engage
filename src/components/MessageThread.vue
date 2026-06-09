@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useMessagesStore } from "../stores/messages";
 import { useContactsStore } from "../stores/contacts";
 import { useDisappearingMessages, TIMER_OPTIONS, formatTimer } from "../composables/useDisappearingMessages";
+import { useWebSocket } from "../composables/useWebSocket";
 import Avatar from "primevue/avatar";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -16,6 +17,7 @@ const props = defineProps<{ contactId: string }>();
 const messages = useMessagesStore();
 const contacts = useContactsStore();
 const { scheduleExpiry, startSweep } = useDisappearingMessages();
+const ws = useWebSocket();
 
 const input = ref("");
 const threadEl = ref<HTMLElement | null>(null);
@@ -47,6 +49,10 @@ async function load() {
 
   // Schedule JS timers for any message with a future expiry
   await startSweep(msgs.value);
+
+  // @faridguzman91: Emit read receipts for all received messages now that
+  // the user has the conversation open.
+  ws.markRead(props.contactId);
 }
 
 async function send() {
@@ -95,6 +101,15 @@ onUnmounted(() => {
 });
 
 watch(() => props.contactId, load);
+
+// @faridguzman91: When a new message arrives while this thread is visible,
+// mark it read immediately (the WS handler already appended it to the store).
+watch(msgs, (next, prev) => {
+  if (next.length > (prev?.length ?? 0)) {
+    ws.markRead(props.contactId);
+    scrollToBottom();
+  }
+});
 </script>
 
 <template>
