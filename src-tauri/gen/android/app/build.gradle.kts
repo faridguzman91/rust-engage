@@ -45,9 +45,14 @@ android {
             )
         }
     }
+    // @faridguzman: Java + Kotlin must target the same JVM version or Gradle
+    // raises "Inconsistent JVM-target compatibility".  Both set to 17 to match
+    // Android Studio's bundled JBR and silence the JDK 21 deprecation warning.
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
     kotlinOptions {
-        // @faridguzman: Java 17 — matches Android Studio's bundled JBR and
-        // silences the "source/target value 8 is obsolete" JDK 21 warning.
         jvmTarget = "17"
     }
     buildFeatures {
