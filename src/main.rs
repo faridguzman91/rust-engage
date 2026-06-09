@@ -44,7 +44,10 @@ async fn main() {
     // Public routes — no auth required
     let public = Router::new()
         .route("/api/auth/google", get(routes::oauth::start))
-        .route("/api/auth/google/callback", get(routes::oauth::callback));
+        .route("/api/auth/google/callback", get(routes::oauth::callback))
+        // @faridguzman: Invite redemption is public so the recipient does not need
+        // an account yet when they tap the link.
+        .route("/api/invites/{token}", get(routes::invites::redeem_invite));
 
     // Protected routes — JWT required
     let protected = Router::new()
@@ -61,6 +64,8 @@ async fn main() {
         .route("/api/groups/{id}/members", post(routes::groups::add_member))
         .route("/api/groups/{id}/members/{user_id}", axum::routing::delete(routes::groups::remove_member))
         .route("/api/groups/{id}/messages", post(routes::groups::send_group_message))
+        // @faridguzman: Invite creation — authenticated so only registered users can issue links.
+        .route("/api/invites", post(routes::invites::create_invite))
         .route("/ws/{user_id}", get(routes::ws::ws_handler))
         .layer(middleware::from_fn_with_state(
             app_state.clone(),

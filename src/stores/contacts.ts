@@ -1,4 +1,4 @@
-// @faridguzman91: Contacts store — CRUD for the contact list plus X3DH session management.
+// @faridguzman: Contacts store — CRUD for the contact list plus X3DH session management.
 // The first time a message is sent to a contact, ensureSession() fetches their prekey bundle
 // from the server, runs X3DH locally, and seeds the Double Ratchet. The ephemeral key
 // produced during X3DH is sent with the first message so the recipient can mirror the exchange.
@@ -18,7 +18,7 @@ export interface Contact {
 export const useContactsStore = defineStore("contacts", () => {
   const contacts = ref<Contact[]>([]);
 
-  // @faridguzman91: ephemeralKeys maps contactId → base64 EK_A produced during X3DH init.
+  // @faridguzman: ephemeralKeys maps contactId → base64 EK_A produced during X3DH init.
   // The key is included in the first message envelope so the recipient can complete X3DH.
   // After it's consumed (sent once), the entry is set to "" to indicate "session exists but EK sent".
   const ephemeralKeys = ref<Record<string, string>>({});
@@ -40,7 +40,7 @@ export const useContactsStore = defineStore("contacts", () => {
   }
 
   /**
-   * @faridguzman91: Ensure a Double Ratchet session exists for this contact.
+   * @faridguzman: Ensure a Double Ratchet session exists for this contact.
    *
    * First call  → fetches remote prekey bundle, runs X3DH, seeds the ratchet.
    *               Returns the EK_A (ephemeral key) to include in the first message.
@@ -65,7 +65,7 @@ export const useContactsStore = defineStore("contacts", () => {
     const ek = await invoke<string>("init_session", { contactId, bundle });
     ephemeralKeys.value[contactId] = ek;
 
-    // @faridguzman91: One OPK was consumed — check if replenishment is needed
+    // @faridguzman: One OPK was consumed — check if replenishment is needed
     useOpkReplenishment().checkAndReplenish();
 
     return ek;

@@ -1,4 +1,4 @@
-// @faridguzman91: Identity store — manages the user's local crypto keys.
+// @faridguzman: Identity store — manages the user's local crypto keys.
 // On first run (after OAuth) the user picks a display name and this store:
 //   1. Generates Ed25519 + X25519 key pairs locally via Tauri (never leaves the device unencrypted)
 //   2. Registers the public keys with the relay server
@@ -10,7 +10,7 @@ import { useServerApi } from "../composables/useServerApi";
 import { useWebSocket } from "../composables/useWebSocket";
 import { useAuthStore } from "./auth";
 
-// @faridguzman91: Re-export userId as a module-level computed so groups.ts can
+// @faridguzman: Re-export userId as a module-level computed so groups.ts can
 // access it without importing the whole store (avoids circular imports).
 export function useUserId(): string {
   const auth = useAuthStore();
@@ -27,7 +27,7 @@ export const useIdentityStore = defineStore("identity", () => {
   const keys = ref<IdentityKeys | null>(null);
   const displayName = ref<string>("");
 
-  // @faridguzman91: isSetup drives the router guard — both keys AND displayName must be
+  // @faridguzman: isSetup drives the router guard — both keys AND displayName must be
   // present before the user is allowed past the /setup route.
   const isSetup = computed(() => keys.value !== null && displayName.value !== "");
 

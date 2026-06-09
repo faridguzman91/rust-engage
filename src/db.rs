@@ -88,6 +88,17 @@ fn migrate(conn: &Connection) -> Result<()> {
             PRIMARY KEY (group_id, user_id)
         );
         CREATE INDEX IF NOT EXISTS idx_gm_user ON group_members(user_id);
+
+        -- @faridguzman: Invite tokens — short-lived single-use links for onboarding new contacts.
+        -- token: 32-byte random hex (64 chars); expires_at: Unix-ms; used: 0=available, 1=redeemed.
+        CREATE TABLE IF NOT EXISTS invite_tokens (
+            token       TEXT PRIMARY KEY,
+            user_id     TEXT NOT NULL REFERENCES devices(user_id),
+            created_at  INTEGER NOT NULL,
+            expires_at  INTEGER NOT NULL,
+            used        INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_invite_user ON invite_tokens(user_id);
         ",
     )?;
 

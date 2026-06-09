@@ -1,4 +1,4 @@
-// @faridguzman91: Vue Router with two-layer guards — auth (JWT present?) then identity (keys set up?).
+// @faridguzman: Vue Router with two-layer guards — auth (JWT present?) then identity (keys set up?).
 // Hash history is used so the Tauri webview and Vite dev server both handle routing consistently.
 import { createRouter, createWebHashHistory } from "vue-router";
 import { useIdentityStore } from "../stores/identity";
@@ -9,7 +9,7 @@ const router = createRouter({
   routes: [
     { path: "/", redirect: "/chat" },
     {
-      // @faridguzman91: OAuth callback — server redirects here with ?token=JWT (dev mode).
+      // @faridguzman: OAuth callback — server redirects here with ?token=JWT (dev mode).
       // In production the engage:// deep-link is used instead.
       path: "/auth",
       component: () => import("../views/AuthCallbackView.vue"),
@@ -35,7 +35,7 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresIdentity: true },
     },
     {
-      // @faridguzman91: Group conversation thread
+      // @faridguzman: Group conversation thread
       path: "/group/:groupId",
       component: () => import("../views/GroupView.vue"),
       meta: { requiresAuth: true, requiresIdentity: true },
@@ -45,10 +45,18 @@ const router = createRouter({
       component: () => import("../views/SettingsView.vue"),
       meta: { requiresAuth: true, requiresIdentity: true },
     },
+    {
+      // @faridguzman: Invite acceptance — reachable via engage://invite?token=TOKEN deep link
+      // or directly as /#/invite?token=TOKEN.  Requires auth so the recipient must sign in
+      // before adding a contact (identity keys need to exist for the session to work).
+      path: "/invite",
+      component: () => import("../views/InviteView.vue"),
+      meta: { requiresAuth: true, requiresIdentity: true },
+    },
   ],
 });
 
-// @faridguzman91: Guard order matters — check auth before identity so unauthenticated
+// @faridguzman: Guard order matters — check auth before identity so unauthenticated
 // users never reach a route that would call invoke() and crash without Tauri context.
 router.beforeEach((to) => {
   const auth = useAuthStore();

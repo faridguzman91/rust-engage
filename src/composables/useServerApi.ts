@@ -1,4 +1,4 @@
-// @faridguzman91: Typed fetch wrapper for the relay server.
+// @faridguzman: Typed fetch wrapper for the relay server.
 // Automatically attaches the Bearer JWT to every request.
 // On 401 (token expired/revoked), clears localStorage and redirects to /login.
 import { SERVER_BASE } from "../config";
@@ -24,7 +24,7 @@ function getToken(): string | null {
   return localStorage.getItem("engage_jwt");
 }
 
-// @faridguzman91: Generic request helper — handles JSON Content-Type, auth header,
+// @faridguzman: Generic request helper — handles JSON Content-Type, auth header,
 // 401 redirect, and empty-body (204) responses.
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const token = getToken();
@@ -61,13 +61,13 @@ export interface ContactSuggestion {
 }
 
 export function useServerApi() {
-  // @faridguzman91: Register uploads public crypto keys after first identity creation.
+  // @faridguzman: Register uploads public crypto keys after first identity creation.
   // The server derives user_id from the JWT — the body cannot override it.
   async function register(payload: RegisterPayload): Promise<void> {
     return request("POST", "/api/register", payload);
   }
 
-  // @faridguzman91: Fetches a remote contact's prekey bundle for X3DH session init.
+  // @faridguzman: Fetches a remote contact's prekey bundle for X3DH session init.
   // The server atomically marks one OPK as used so it is never served twice.
   async function fetchPreKeyBundle(userId: string): Promise<PreKeyBundle> {
     return request("GET", `/api/keys/${encodeURIComponent(userId)}`);
@@ -85,7 +85,7 @@ export function useServerApi() {
     return request("GET", `/api/messages/${encodeURIComponent(userId)}`);
   }
 
-  // @faridguzman91: Returns how many unused OPKs the server holds for us.
+  // @faridguzman: Returns how many unused OPKs the server holds for us.
   async function fetchOpkCount(userId: string): Promise<{ remaining: number }> {
     return request("GET", `/api/keys/${encodeURIComponent(userId)}/prekeys/count`);
   }
@@ -130,9 +130,24 @@ export function useServerApi() {
     return request("GET", "/api/contacts/suggest");
   }
 
+  // ── Invites ─────────────────────────────────────────────────────────────────
+
+  // @faridguzman: Create a 24-hour invite token for the authenticated user.
+  // Returns the token and a ready-to-share engage:// deep-link URL.
+  async function createInvite(): Promise<{ token: string; expiresAt: number; url: string }> {
+    return request("POST", "/api/invites");
+  }
+
+  // @faridguzman: Redeem an invite token (public endpoint — no auth needed).
+  // Returns the inviter's display name and identity key so the recipient can
+  // call addContact locally without any server-side contact storage.
+  async function redeemInvite(token: string): Promise<{ userId: string; displayName: string; identityKey: string }> {
+    return request("GET", `/api/invites/${encodeURIComponent(token)}`);
+  }
+
   return {
     register, fetchPreKeyBundle, uploadPreKeys, sendEnvelope, fetchPendingMessages, fetchOpkCount,
     createGroup, listGroups, getGroup, addGroupMember, removeGroupMember, sendGroupEnvelope,
-    suggestContacts,
+    suggestContacts, createInvite, redeemInvite,
   };
 }

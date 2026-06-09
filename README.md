@@ -511,9 +511,9 @@ For production: use HTTPS, remove `FRONTEND_URL` (uses `engage://` deep-link), r
 
 ### Invites
 
-- [ ] **Invite links** — server generates short-lived signed token at `/invite/:token`; client handles via `engage://invite/:token` deep link
-- [ ] **QR code** — render identity key + invite URL as QR in settings (frontend only, no server changes)
-- [ ] **Share sheet** — Tauri shell `open` with `mailto:` / `sms:` URI to share invite link
+- [x] **Invite links** — `POST /api/invites` issues a 24-hour single-use token; `GET /api/invites/:token` (public) returns inviter bundle; `engage://invite?token=TOKEN` deep link handled in `App.vue`
+- [x] **QR code** — rendered in Settings with `qrcode` using brand colours; scanned QR opens the deep link
+- [x] **Share sheet** — `mailto:` and `sms:` via `tauri-plugin-opener`; copy-to-clipboard button with confirmation feedback
 
 ### Android Port
 
