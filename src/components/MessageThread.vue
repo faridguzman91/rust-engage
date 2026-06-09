@@ -29,7 +29,7 @@ let sweepInterval: ReturnType<typeof setInterval> | null = null;
 const contact = computed(() => contacts.getById(props.contactId));
 const msgs = computed(() => messages.forConversation(props.contactId));
 
-// @faridguzman91: Format the expiry countdown for display on a bubble
+// @faridguzman: Format the expiry countdown for display on a bubble
 function formatCountdown(expiresAt: number): string {
   const remaining = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
   if (remaining < 60)   return `${remaining}s`;
@@ -50,7 +50,7 @@ async function load() {
   // Schedule JS timers for any message with a future expiry
   await startSweep(msgs.value);
 
-  // @faridguzman91: Emit read receipts for all received messages now that
+  // @faridguzman: Emit read receipts for all received messages now that
   // the user has the conversation open.
   ws.markRead(props.contactId);
 }
@@ -90,7 +90,7 @@ function avatarLabel(name?: string) {
 
 onMounted(() => {
   load();
-  // @faridguzman91: Periodic sweep every 30s to clean up expired messages
+  // @faridguzman: Periodic sweep every 30s to clean up expired messages
   sweepInterval = setInterval(async () => {
     await invoke("sweep_expired_messages");
   }, 30_000);
@@ -102,7 +102,7 @@ onUnmounted(() => {
 
 watch(() => props.contactId, load);
 
-// @faridguzman91: When a new message arrives while this thread is visible,
+// @faridguzman: When a new message arrives while this thread is visible,
 // mark it read immediately (the WS handler already appended it to the store).
 watch(msgs, (next, prev) => {
   if (next.length > (prev?.length ?? 0)) {
@@ -129,7 +129,7 @@ watch(msgs, (next, prev) => {
         </div>
       </div>
       <div class="header-actions">
-        <!-- @faridguzman91: Disappear timer picker -->
+        <!-- @faridguzman: Disappear timer picker -->
         <div class="timer-wrap" v-tooltip.bottom="'Disappearing messages'">
           <i class="pi pi-clock timer-icon" :class="{ active: timerSecs > 0 }" />
           <Select
@@ -188,7 +188,7 @@ watch(msgs, (next, prev) => {
                 :class="msg.status === 'read' ? 'pi-check-circle' : 'pi-check'"
                 style="font-size:0.65rem;"
               />
-              <!-- @faridguzman91: Expiry countdown shown on disappearing messages -->
+              <!-- @faridguzman: Expiry countdown shown on disappearing messages -->
               <span v-if="msg.expiresAt" class="expiry-badge">
                 <i class="pi pi-clock" style="font-size:0.6rem;" />
                 {{ formatCountdown(msg.expiresAt) }}
@@ -243,7 +243,7 @@ watch(msgs, (next, prev) => {
 .contact-name { font-weight: 600; font-size: 0.95rem; margin: 0 0 0.2rem; }
 .header-actions { display: flex; align-items: center; gap: 0.25rem; }
 
-/* @faridguzman91: Timer picker — clock icon + hidden select overlay */
+/* @faridguzman: Timer picker — clock icon + hidden select overlay */
 .timer-wrap {
   display: flex;
   align-items: center;

@@ -1,4 +1,4 @@
-// @faridguzman91: WebSocket singleton — one persistent connection per app session.
+// @faridguzman: WebSocket singleton — one persistent connection per app session.
 // Handles:
 //   - JWT auth via ?token= query param (WebSocket handshakes can't send headers)
 //   - Incoming message decryption via Tauri invoke (X3DH inbound session init + Double Ratchet)
@@ -20,7 +20,7 @@ function getToken(): string {
 
 type WSStatus = "disconnected" | "connecting" | "connected";
 
-// @faridguzman91: Module-level singleton so all components share one socket instance
+// @faridguzman: Module-level singleton so all components share one socket instance
 let socket: WebSocket | null = null;
 let userId: string | null = null;
 let retryDelay = 1000;
@@ -47,8 +47,11 @@ export function useWebSocket() {
     socket.onopen = () => {
       status.value = "connected";
       retryDelay = 1000; // reset backoff on successful connect
-      // @faridguzman91: Check OPK pool silently on every (re)connect
+      // @faridguzman: Check OPK pool silently on every (re)connect
       useOpkReplenishment().checkAndReplenish();
+      // @faridguzman: Drain any envelopes that failed to send while offline.
+      // Runs async — does not block the WS message loop.
+      messagesStore.drainPending().catch(() => {});
     };
 
     socket.onmessage = async (event) => {
@@ -86,7 +89,7 @@ export function useWebSocket() {
           timestamp: number;
         };
 
-        // @faridguzman91: First message from this sender includes ephemeralKey (X3DH EK_A).
+        // @faridguzman: First message from this sender includes ephemeralKey (X3DH EK_A).
         // We must init the inbound session before decrypting.
         if (raw.ephemeralKey) {
           try {
@@ -123,7 +126,7 @@ export function useWebSocket() {
         };
         messagesStore.append(msg);
 
-        // @faridguzman91: If the sender has set a disappear timer, set expiry
+        // @faridguzman: If the sender has set a disappear timer, set expiry
         // on the inbound message and schedule its removal
         if (msg.expiresAt) {
           await invoke("set_message_expiry", {
@@ -137,7 +140,7 @@ export function useWebSocket() {
         send({ type: "ack", messageId: raw.id });
       }
 
-      // @faridguzman91: Group message — decrypt with the sender's Sender Key
+      // @faridguzman: Group message — decrypt with the sender's Sender Key
       if (envelope.type === "group_message") {
         const raw = envelope.payload as {
           id: string;
@@ -156,7 +159,7 @@ export function useWebSocket() {
           body = "[encrypted group message]";
         }
 
-        // @faridguzman91: Check if this is a control message (Sender Key distribution)
+        // @faridguzman: Check if this is a control message (Sender Key distribution)
         try {
           const ctrl = JSON.parse(body);
           if (ctrl.__control && ctrl.type === "sender_key_distribution") {
@@ -180,7 +183,7 @@ export function useWebSocket() {
 
     socket.onclose = () => {
       status.value = "disconnected";
-      // @faridguzman91: Exponential backoff — doubles each attempt, capped at 30s
+      // @faridguzman: Exponential backoff — doubles each attempt, capped at 30s
       setTimeout(() => {
         retryDelay = Math.min(retryDelay * 2, MAX_DELAY);
         _connect();
@@ -206,7 +209,7 @@ export function useWebSocket() {
     }
   }
 
-  // @faridguzman91: Emit "read" receipts for every received message in a
+  // @faridguzman: Emit "read" receipts for every received message in a
   // conversation. Called when the user opens a thread (and on each new
   // incoming message while the thread is visible). The server looks up the
   // original sender and forwards a WsEnvelope::Read to them.

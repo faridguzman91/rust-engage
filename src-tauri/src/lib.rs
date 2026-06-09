@@ -1,4 +1,4 @@
-// @faridguzman91: Tauri application entry point.
+// @faridguzman: Tauri application entry point.
 // Registers all IPC commands, initialises the SQLite database, and sets up
 // the deep-link handler (engage:// scheme) for production OAuth callbacks.
 mod commands;
@@ -10,7 +10,7 @@ use std::sync::Mutex;
 use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
 
-// @faridguzman91: AppState holds the single SQLite connection behind a Mutex.
+// @faridguzman: AppState holds the single SQLite connection behind a Mutex.
 // All Tauri commands that touch the DB acquire this lock.
 pub struct AppState {
     pub db: Mutex<Connection>,
@@ -45,6 +45,10 @@ pub fn run() {
             commands::messages::list_messages,
             commands::messages::send_message,
             commands::messages::update_message_status,
+            commands::messages::queue_pending_message,
+            commands::messages::list_pending_messages,
+            commands::messages::remove_pending_message,
+            commands::messages::increment_pending_retry,
             commands::crypto::generate_prekey_bundle,
             commands::crypto::encrypt_message,
             commands::crypto::decrypt_message,

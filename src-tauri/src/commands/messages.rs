@@ -1,4 +1,4 @@
-// @faridguzman91: Tauri commands for local message persistence.
+// @faridguzman: Tauri commands for local message persistence.
 // send_message respects the conversation's disappear timer — if disappear_after_secs > 0
 // the row is inserted with expires_at = now + ttl so sweep_expired_messages removes it later.
 use rusqlite::params;
@@ -41,7 +41,7 @@ pub fn list_messages(
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let mut stmt = db
         .prepare(
-            // @faridguzman91: Exclude already-expired messages on load so stale rows
+            // @faridguzman: Exclude already-expired messages on load so stale rows
             // don't appear if sweep hasn't run yet this session.
             "SELECT id, conversation_id, sender_id, body, timestamp, status, is_mine, expires_at
              FROM messages
@@ -82,7 +82,7 @@ pub fn send_message(
 
     let db = state.db.lock().map_err(|e| e.to_string())?;
 
-    // @faridguzman91: Check if this conversation has a disappear timer active
+    // @faridguzman: Check if this conversation has a disappear timer active
     let disappear_secs: u64 = db
         .query_row(
             "SELECT disappear_after_secs FROM contacts WHERE id=?1",
@@ -126,6 +126,122 @@ pub fn send_message(
     .map_err(|e| e.to_string())?;
 
     Ok(msg)
+}
+
+// ── Pending message queue ─────────────────────────────────────────────────────
+
+/// @faridguzman: A sealed envelope that failed to reach the relay server.
+/// Stored verbatim so we can retry the POST without re-encrypting (the ratchet
+/// has already advanced; re-encrypting would produce an out-of-order ciphertext
+/// that the recipient cannot decrypt).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PendingMessage {
+    pub id: String,
+    #[serde(rename = "conversationId")]
+    pub conversation_id: String,
+    #[serde(rename = "recipientId")]
+    pub recipient_id: String,
+    #[serde(rename = "senderIk")]
+    pub sender_ik: String,
+    #[serde(rename = "ephemeralKey")]
+    pub ephemeral_key: Option<String>,
+    pub ciphertext: String,
+    pub timestamp: i64,
+    #[serde(rename = "retryCount")]
+    pub retry_count: i32,
+}
+
+/// @faridguzman: Enqueue a sealed envelope that failed to send.
+/// Called immediately after encrypt_message so the ciphertext is never lost,
+/// even if the app crashes before the POST succeeds.
+#[tauri::command]
+pub fn queue_pending_message(
+    message_id: String,
+    conversation_id: String,
+    recipient_id: String,
+    sender_ik: String,
+    ephemeral_key: Option<String>,
+    ciphertext: String,
+    timestamp: i64,
+    state: State<AppState>,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.execute(
+        "INSERT OR REPLACE INTO pending_messages
+         (id, conversation_id, recipient_id, sender_ik, ephemeral_key, ciphertext, timestamp)
+         VALUES (?1,?2,?3,?4,?5,?6,?7)",
+        params![
+            message_id, conversation_id, recipient_id,
+            sender_ik, ephemeral_key, ciphertext, timestamp
+        ],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// @faridguzman: Return all queued envelopes ordered by timestamp (oldest first).
+/// The drain loop in the client iterates this list and retries each POST.
+#[tauri::command]
+pub fn list_pending_messages(state: State<AppState>) -> Result<Vec<PendingMessage>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let mut stmt = db
+        .prepare(
+            "SELECT id, conversation_id, recipient_id, sender_ik,
+                    ephemeral_key, ciphertext, timestamp, retry_count
+             FROM pending_messages
+             ORDER BY timestamp",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            Ok(PendingMessage {
+                id: row.get(0)?,
+                conversation_id: row.get(1)?,
+                recipient_id: row.get(2)?,
+                sender_ik: row.get(3)?,
+                ephemeral_key: row.get(4)?,
+                ciphertext: row.get(5)?,
+                timestamp: row.get(6)?,
+                retry_count: row.get(7)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<_, _>>()
+        .map_err(|e| e.to_string())?;
+
+    Ok(rows)
+}
+
+/// @faridguzman: Remove a successfully delivered envelope from the retry queue.
+#[tauri::command]
+pub fn remove_pending_message(
+    message_id: String,
+    state: State<AppState>,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.execute(
+        "DELETE FROM pending_messages WHERE id=?1",
+        params![message_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// @faridguzman: Increment the retry counter for a pending message so we can
+/// surface persistent failures to the user after too many attempts.
+#[tauri::command]
+pub fn increment_pending_retry(
+    message_id: String,
+    state: State<AppState>,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.execute(
+        "UPDATE pending_messages SET retry_count = retry_count + 1 WHERE id=?1",
+        params![message_id],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 /// Update the delivery status of a locally-stored message.
