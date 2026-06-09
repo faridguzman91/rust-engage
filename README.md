@@ -507,9 +507,9 @@ echo "VITE_SERVER_URL=http://10.0.2.2:3000" >> .env.local   # emulator
 # 4. Enable Windows Developer Mode (Settings → System → For developers)
 #    Required for symlink creation during APK packaging
 
-# 5. Build debug APK
+# 5. Build APK
 make android-build
-# APK → src-tauri/gen/android/app/build/outputs/apk/debug/
+# APK → src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk
 
 # 6. Dev build with hot-reload on connected device / emulator
 make android-dev
@@ -589,14 +589,14 @@ CI builds a debug APK on every push — artifacts available in GitHub Actions fo
 - [x] App Links — `https://engage.app/auth` + `/invite`; `android:autoVerify="true"` in `AndroidManifest.xml`
 - [x] SQLite path — `app_data_dir()` resolves to `/data/data/com.engage.app/files/`
 - [x] Android Gradle project generated and committed — `minSdkVersion=24`, INTERNET permission, edge-to-edge
-- [x] Rust cross-compilation verified — `aarch64-linux-android` compiles successfully
+- [x] Rust cross-compilation verified — all four ABIs compile successfully
+- [x] **APK builds** — `app-universal-release-unsigned.apk` produced; Gradle warnings are all upstream Tauri / JDK version cosmetics, zero errors
 - [x] CI pipeline — `.github/workflows/android.yml` (NDK 30, 4 ABI targets, debug APK artifact)
 - [x] Makefile targets + rustup PATH fix for Windows Scoop installs
 - [x] [`ANDROID.md`](ANDROID.md) — SDK/NDK setup, fingerprints (3 methods), OAuth client, `assetlinks.json`, server URL per target, signing, troubleshooting
-- [ ] Enable **Windows Developer Mode** — `Settings → System → For developers` (symlink requirement)
-- [ ] Set `VITE_SERVER_URL` for emulator / device in `.env.local`
-- [ ] Register Android OAuth 2.0 Client ID in Google Cloud Console (SHA-1 fingerprint)
-- [ ] Deploy `assetlinks.json` to `https://engage.app/.well-known/` (SHA-256 fingerprint)
+- [ ] Set `VITE_SERVER_URL` for emulator (`10.0.2.2:3000`) or device (LAN IP) in `.env.local`
+- [ ] Register Android OAuth 2.0 Client ID in Google Cloud Console with SHA-1 fingerprint
+- [ ] Deploy `assetlinks.json` to `https://engage.app/.well-known/` with SHA-256 fingerprint for App Link verification
 
 ### iOS Port
 

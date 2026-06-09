@@ -46,7 +46,9 @@ android {
         }
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        // @faridguzman: Java 17 — matches Android Studio's bundled JBR and
+        // silences the "source/target value 8 is obsolete" JDK 21 warning.
+        jvmTarget = "17"
     }
     buildFeatures {
         buildConfig = true
