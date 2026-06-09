@@ -4,13 +4,22 @@
 
 ---
 
-End-to-end encrypted chat — desktop today, Android next. Built with Tauri 2, Vue 3, and Rust.
+End-to-end encrypted chat — desktop (Windows / macOS / Linux) and Android. Built with Tauri 2, Vue 3, and Rust.
 
 ![engage chat UI](screenshot.png)
 
 Messages are encrypted on your device before leaving it. The relay server forwards sealed envelopes and never has access to plaintext. Identity is verified via Google OAuth; sessions are authenticated with JWTs.
 
 > **Author:** [@faridguzman91](https://github.com/faridguzman91)
+
+---
+
+## Releases
+
+| Version | Highlights |
+|---|---|
+| [v0.2.0](https://github.com/faridguzman91/rust-engage/releases/tag/v0.2.0) | Message reliability (receipts, retry queue, gap detection), invite system, Android port |
+| [v0.1.0](https://github.com/faridguzman91/rust-engage/releases/tag/v0.1.0) | E2EE foundation, groups, disappearing messages, Gmail import |
 
 ---
 
@@ -25,15 +34,15 @@ Messages are encrypted on your device before leaving it. The relay server forwar
 │  ├─ Vue Router                      │  HTTPS │  ├─ Key distribution API             │
 │  └─ Tauri IPC bridge                │        │  ├─ Sealed message relay             │
 │                                     │        │  ├─ Group fan-out                    │
-│  Rust backend (Tauri)               │        │  ├─ WebSocket push                   │
-│  ├─ X3DH key agreement              │        │  ├─ Sequence counters (gap detect)   │
-│  ├─ Double Ratchet                  │        │  └─ Invite token issuance            │
+│  Rust backend (Tauri)               │        │  ├─ Sequence counters (gap detect)   │
+│  ├─ X3DH key agreement              │        │  ├─ Invite token issuance            │
+│  ├─ Double Ratchet                  │        │  └─ WebSocket push + ack forwarding  │
 │  ├─ Sender Keys (groups)            │        │                                      │
-│  ├─ pending_messages retry queue    │        │  SQLite (server-side)                │
-│  └─ SQLite (local)                  │        │  (stores only ciphertext)            │
-└─────────────────────────────────────┘        └──────────────────────────────────────┘
+│  ├─ pending_messages retry queue    │        │  SQLite — ciphertext only            │
+│  └─ SQLite (local)                  │        └──────────────────────────────────────┘
+└─────────────────────────────────────┘
 
-Platforms:  Desktop (Windows / macOS / Linux)  ·  Android (Tauri 2 mobile target)
+Platforms:  Desktop (Windows / macOS / Linux)  ·  Android (Tauri 2 — code complete)
 ```
 
 ### Cryptography stack
@@ -44,7 +53,7 @@ Platforms:  Desktop (Windows / macOS / Linux)  ·  Android (Tauri 2 mobile targe
 | Ed25519 | Signed prekey signatures | `ed25519-dalek` |
 | AES-256-GCM | 1:1 + group message encryption | `aes-gcm` |
 | HKDF-SHA256 | Key derivation (X3DH, ratchet KDF, Sender Key ratchet) | `hkdf` / `sha2` |
-| Sender Keys | Group message encryption — one encrypt, N recipients | `aes-gcm` |
+| Sender Keys | Group encryption — one encrypt, N recipients | `aes-gcm` |
 | HS256 JWT | Session authentication | `jsonwebtoken` |
 
 The full [X3DH](https://signal.org/docs/specifications/x3dh/) + [Double Ratchet](https://signal.org/docs/specifications/doubleratchet/) + Sender Keys protocol is implemented in pure Rust in `src-tauri/src/crypto/`.
@@ -54,46 +63,47 @@ The full [X3DH](https://signal.org/docs/specifications/x3dh/) + [Double Ratchet]
 ## Features
 
 ### 🔐 End-to-end encryption
-- **X3DH** key agreement on first message — start a conversation with someone who is offline
+- **X3DH** key agreement on first message — start a conversation with someone offline
 - **Double Ratchet** for every 1:1 message — forward secrecy + break-in recovery
 - **Sender Keys** for groups — one encryption, N recipients, server sees a single ciphertext
 - All crypto runs in the Tauri Rust backend; the frontend only sees plaintext
 
-### 💬 Message reliability (Phase 1–3)
-- **Delivery receipts** — server forwards `ack` from recipient back to sender; `✓` → `✓✓`
-- **Read receipts** — emitted when recipient opens the conversation thread; `✓✓` (filled)
-- **Optimistic send** — message shows immediately as `sending`; updates to `sent` / `failed`
-- **Retry queue** — sealed envelopes persisted in `pending_messages` SQLite table; replayed on every WebSocket reconnect; crash-safe (queued before the POST attempt)
-- **Sequence numbers** — per-recipient monotonic counter on every envelope; client detects gaps and automatically drains the server queue to recover missed messages
+### 💬 Message reliability
+- **Delivery receipts** — server forwards `ack` from recipient back to sender; `sent → delivered`
+- **Read receipts** — emitted when recipient opens the conversation; `delivered → read`
+- **Optimistic send** — message appears immediately as `sending`; updates to `sent` / `failed`
+- **Retry queue** — sealed envelope persisted to `pending_messages` SQLite table before every POST; crash-safe; replayed automatically on WS reconnect
+- **Sequence numbers** — per-recipient monotonic counter stamped on every envelope; gap detected → server queue drained instantly to recover missed messages
 
 ### 📬 Invites
 - `POST /api/invites` — 24-hour single-use token (32 random bytes, hex-encoded)
-- `GET /api/invites/:token` — public endpoint returns inviter's display name + identity key
-- Settings panel: generate link → copy, QR code (brand colours via `qrcode`), share via email or SMS
+- `GET /api/invites/:token` — public endpoint; returns inviter's display name + identity key; marks token used atomically
+- Settings panel: generate link, copy button, QR code (brand colours via `qrcode`), share via email or SMS
 - `engage://invite?token=TOKEN` deep link → `/invite` acceptance screen → `addContact` → navigate to chat
 
 ### 📱 Android
-- Tauri 2 Android target — same Rust crypto core and Vue 3 frontend as desktop
-- App Links (`https://engage.app/auth`, `https://engage.app/invite`) for OAuth and invites
-- CI pipeline builds a debug APK on every push (see `.github/workflows/android.yml`)
-- Full setup guide: [ANDROID.md](ANDROID.md)
+- **Code complete** — same Rust crypto core and Vue 3 frontend as desktop, compiled for Android via Tauri 2 mobile target
+- Android Gradle project in `src-tauri/gen/android/` — `minSdkVersion 24` (Android 7+, ~96% of devices)
+- App Links (`https://engage.app/auth`, `https://engage.app/invite`) handle OAuth callbacks and invite deep links
+- CI builds a debug APK on every push to `master` — see `.github/workflows/android.yml`
+- Full developer setup guide: [ANDROID.md](ANDROID.md)
 
 ### 👥 Group messaging
-- Create groups, add/remove members
-- Sender Keys fan-out — one ciphertext stored per member
+- Create groups, add / remove members
+- Sender Keys fan-out — one ciphertext per message, stored once per member on server
 - Sender name shown above each received bubble
 
 ### ⏱ Disappearing messages
 - Per-conversation TTL (5 s → 1 week) configurable from the chat header
-- Auto-deleted on both sides after the timer fires; local sweep every 30 seconds
+- Auto-deleted on both sides after the timer fires; local sweep every 30 s
 
 ### 📇 Gmail contact import
-- "Find from Gmail" discovers which Gmail contacts are already on engage
-- Server handles OAuth token refresh automatically; no contact data stored
+- "Find from Gmail" discovers which Gmail contacts are already on engage via Google People API
+- Server auto-refreshes OAuth tokens; no contact data stored
 
 ### 🔑 OPK replenishment
-- One-time prekey pool monitored on every WebSocket connect and X3DH session init
-- Auto-uploads a batch of 100 fresh OPKs when pool drops below 10
+- One-time prekey pool monitored on every WS connect and X3DH session init
+- Auto-uploads 100 fresh OPKs when pool drops below 10
 
 ---
 
@@ -111,7 +121,7 @@ The entire interface is built with **[PrimeVue 4](https://primevue.org)** on the
 | Main surface | `#12121c` | Chat area background |
 | Header / composer | `#1a1a2a` | Top bar and message input tray |
 
-Dark mode is applied globally via PrimeVue's `darkModeSelector: ".dark"` — the `.dark` class is added to `<html>` on app mount.
+Dark mode via PrimeVue's `darkModeSelector: ".dark"` — `.dark` class added to `<html>` on mount.
 
 ### Screens
 
@@ -123,72 +133,55 @@ Dark mode is applied globally via PrimeVue's `darkModeSelector: ".dark"` — the
 | **Chat (1:1)** | `/chat/:id` | Two-panel shell with `MessageThread` |
 | **Chat (group)** | `/group/:id` | `GroupView` — `AvatarGroup` header, sender names |
 | **Settings** | `/settings` | Profile, identity keys, invite panel, sign out |
-| **Invite** | `/invite` | Accept an invite link — shows inviter card, Add / Decline |
+| **Invite** | `/invite` | Accept invite — inviter card, Add / Decline |
 
 ### Components
 
-#### `ConversationList`
-- Brand header with `pi-pencil` (new 1:1), `pi-users` (new group), `pi-cog` (settings), Gmail import
-- Self-identity chip with `Avatar` + name + "You" tag
-- Tabs — "Direct" and "Groups" sections
-- New conversation dialog (name + identity key) · New group dialog (name + member picker)
+**`ConversationList`** — brand header, Gmail import, self-identity chip, Direct/Groups tabs, new conversation + new group dialogs
 
-#### `MessageThread` (1:1)
-- Header: contact `Avatar`, name, E2E encrypted `Tag`, disappear timer picker
-- Signal-style bubbles: timestamp, delivery status icon (`pi-check` / `pi-check-circle`), expiry countdown
-- Composer: pill `InputText`, send button; attach + emoji placeholders
+**`MessageThread`** — disappear timer picker, Signal-style bubbles with timestamp + delivery icon (`pi-check` / `pi-check-circle`) + expiry countdown, composer
 
-#### `GroupView` (groups)
-- `AvatarGroup` header with member count
-- Sender name above each received bubble
-- Same composer as 1:1, encrypts with Sender Keys
+**`GroupView`** — `AvatarGroup` header, sender names above bubbles, Sender Key composer
 
-#### `SettingsView`
-- Profile panel, identity keys panel (collapsible)
-- **Invite panel** — generate link, copy button, QR code, email/SMS share
-- Sign out
+**`SettingsView`** — profile, collapsible identity keys, invite panel (generate, copy, QR, share), sign out
 
 ---
 
 ## Message flows
 
-### Send pipeline (optimistic + retry)
+### Send pipeline
 
 ```
 User hits send
-  │
-  ├─ encrypt_message (Double Ratchet — ratchet advances once)
-  ├─ send_message Tauri → persists locally, status = "sending"
-  ├─ queue_pending_message → envelope saved to SQLite (crash-safe)
+  ├─ encrypt_message  (Double Ratchet — advances ratchet once, never again for this message)
+  ├─ send_message     (Tauri) → persist locally, status = "sending", shown in UI immediately
+  ├─ queue_pending    (Tauri) → sealed envelope saved to SQLite before POST (crash-safe)
   ├─ POST /api/messages
-  │   ✓ success → status = "sent", remove from pending queue
-  │   ✗ failure → status = "failed", stays in queue
-  │
-  └─ On next WS reconnect: drainPending() retries all queued envelopes
+  │     ✓ success → status = "sent", dequeue
+  │     ✗ failure → status = "failed", stays in queue
+  └─ WS reconnect → drainPending() → retry each queued envelope oldest-first
 ```
 
 ### Delivery + read receipts
 
 ```
-Alice sends message (status: sent)
-  └─► Bob's client receives → sends { type: "ack", messageId }
-        └─► Server looks up sender_id → pushes Ack to Alice's WS
-              └─► Alice: status = "delivered"  (pi-check-circle)
+Alice sends → status: sent
+  └─► Bob receives → sends { type: "ack", messageId }
+        └─► Server: lookup sender_id → push Ack to Alice's WS
+              └─► Alice: "delivered"   pi-check-circle
 
-Bob opens the thread
-  └─► Client emits { type: "read", messageId } for every received message
-        └─► Server → pushes Read to Alice's WS
-              └─► Alice: status = "read"  (pi-check-circle filled)
+Bob opens thread
+  └─► Client emits { type: "read", messageId } for each received message
+        └─► Server → push Read to Alice's WS
+              └─► Alice: "read"   pi-check-circle (accent colour)
 ```
 
-### Sequence number gap detection
+### Gap detection
 
 ```
 Bob expects seq 4, receives seq 5
-  └─► gap detected (missed seq 4)
-        └─► drainMissed() → GET /api/messages/bob
-              └─► server returns undelivered seq 4
-                    └─► decrypt → append → lastSeq = 5
+  └─► checkSeq() detects gap → drainMissed() → GET /api/messages/bob
+        └─► server returns undelivered seq 4 → decrypt → append → lastSeq = 5
 ```
 
 ### 1:1 messages (Double Ratchet)
@@ -196,47 +189,44 @@ Bob expects seq 4, receives seq 5
 ```
 Alice                             Server                    Bob
 ─────                             ──────                    ───
-fetchPreKeyBundle(bob_id) ──────► GET /api/keys/bob ──────► public keys
+fetchPreKeyBundle(bob_id) ──────► GET /api/keys/bob         public keys
 X3DH key agreement → shared_secret + EK_A
 init Double Ratchet
 encrypt("hello") via ratchet
 POST /api/messages ─────────────► store ciphertext ────────► push via WebSocket
-{ ciphertext, EK_A, JWT }         (never decrypts)           X3DH receive (EK_A)
-                                                              init Double Ratchet
+{ ciphertext, EK_A, seqNum }      (never decrypts)           X3DH receive → init ratchet
                                                               decrypt → "hello"
+                                                              send ack → Alice: delivered
 ```
 
 ### Group messages (Sender Keys)
 
 ```
 Alice creates group "Team" with Bob, Carol
-  └─► distribute SenderKey to Bob (encrypted via pairwise ratchet)
+  └─► distribute SenderKey to Bob   (encrypted via pairwise ratchet)
   └─► distribute SenderKey to Carol (encrypted via pairwise ratchet)
 
 Alice sends "Hello team!":
-  encrypt("Hello team!") with Alice's SenderKey → one ciphertext
+  encrypt with SenderKey → one ciphertext
   POST /api/groups/:id/messages
-    └─► server stores row for Bob, row for Carol (same ciphertext)
-    └─► pushes via WS to Bob and Carol if online
+    └─► server stores one row per member (same ciphertext, per-member seqNum)
+    └─► pushes via WS to online members
 
-Bob receives:
-  decrypt with Alice's stored SenderKey → "Hello team!"
-  Alice's SenderKey ratchets forward on Bob's side
+Bob receives → decrypt with Alice's SenderKey → "Hello team!"
 ```
 
 ### Invite flow
 
 ```
-Alice (Settings) → "Generate invite link"
+Alice → Settings → "Generate invite link"
   └─► POST /api/invites → { token, url: "engage://invite?token=TOKEN" }
-        └─► QR code + copy + email/SMS share
+        └─► QR + copy + email/SMS share
 
-Bob taps the link → engage://invite?token=TOKEN
-  └─► App.vue deep link handler → router.push("/invite?token=TOKEN")
-        └─► GET /api/invites/:token (public, no auth)
-              └─► returns { userId, displayName, identityKey }
-                    └─► Bob clicks "Add contact"
-                          └─► addContact(ik, name) → /chat/:aliceId
+Bob taps link → engage://invite?token=TOKEN
+  └─► App.vue onOpenUrl() → router.push("/invite?token=TOKEN")
+        └─► GET /api/invites/:token (public)
+              └─► returns { displayName, identityKey }; marks token used
+                    └─► Bob clicks "Add contact" → addContact() → /chat/:aliceId
 ```
 
 ### Authentication flow
@@ -246,13 +236,10 @@ Tauri webview                   Server                    Google
 ─────────────                   ──────                    ──────
 window.location.href ─────────► GET /api/auth/google ──► OAuth consent
                                 POST token exchange  ──► id_token + access_token
-                                Store tokens in DB
                                 issue HS256 JWT
 Dev:  redirect ◄─────────────── localhost:1420/#/auth?token=JWT
 Prod: redirect ◄─────────────── engage://auth?token=JWT
-JWT stored in localStorage
-All requests: Authorization: Bearer JWT
-WS: /ws/:userId?token=JWT
+JWT stored in localStorage  ·  Bearer on every request  ·  WS: /ws/:id?token=JWT
 ```
 
 ---
@@ -264,81 +251,84 @@ engage/
 ├── .cargo/config.toml              # rust-lld linker for Windows GNU target
 ├── .github/workflows/
 │   └── android.yml                 # Android CI — debug APK on every push
-├── ANDROID.md                      # Android port developer setup guide
+├── ANDROID.md                      # Android port complete developer guide
 ├── Makefile                        # dev / build / android-* / docker-* targets
-├── docker-compose.yml              # Compose file for the relay server
+├── docker-compose.yml              # Compose for relay server
 │
-├── src/                            # ── Server (Axum relay) ──────────────────
-│   ├── main.rs                     # Route registration, server entry point
-│   ├── auth.rs                     # JWT middleware
-│   ├── db.rs                       # Server SQLite schema + migrations
-│   ├── models.rs                   # Request/response + WsEnvelope types
-│   ├── state.rs                    # AppState (DB, WS connections map)
+├── src/                            # ── Axum relay server ────────────────────
+│   ├── main.rs                     # Route registration + server entry point
+│   ├── auth.rs                     # JWT middleware (require_auth extractor)
+│   ├── db.rs                       # SQLite schema + migrations (seq_counters, invite_tokens)
+│   ├── models.rs                   # Request/response + WsEnvelope types (Ack, Read, seqNum)
+│   ├── state.rs                    # AppState — Mutex<Connection> + DashMap WS connections
 │   └── routes/
 │       ├── oauth.rs                # Google OAuth start + callback
 │       ├── keys.rs                 # Prekey bundle, OPK upload/count
-│       ├── messages.rs             # Send envelope, fetch offline, seq counter
-│       ├── groups.rs               # Group CRUD + fan-out delivery
-│       ├── invites.rs              # Create + redeem invite tokens
-│       └── ws.rs                   # WebSocket handler — ack/read forwarding
+│       ├── messages.rs             # Send envelope, offline fetch, next_seq()
+│       ├── groups.rs               # Group CRUD + Sender Key fan-out (per-member seqNum)
+│       ├── invites.rs              # POST /api/invites · GET /api/invites/:token
+│       └── ws.rs                   # WS upgrade, ack/read frame routing
 │
-├── src/                            # ── Frontend (Vue 3) ─────────────────────
-│   ├── config.ts                   # VITE_SERVER_URL
+├── src/                            # ── Vue 3 frontend ───────────────────────
+│   ├── config.ts                   # VITE_SERVER_URL → SERVER_BASE + SERVER_WS
 │   ├── main.ts                     # PrimeVue + Pinia + Router setup
 │   ├── styles/global.css           # Design tokens, PrimeVue dark overrides
-│   ├── router/index.ts             # Auth + identity route guards
-│   ├── App.vue                     # Deep link handler (engage://)
+│   ├── router/index.ts             # Auth + identity route guards; /invite route
+│   ├── App.vue                     # onOpenUrl deep link handler (engage://)
 │   │
 │   ├── stores/
 │   │   ├── auth.ts                 # JWT storage, Google OAuth
 │   │   ├── identity.ts             # Key generation, server registration, WS connect
 │   │   ├── contacts.ts             # Contact CRUD + X3DH session init
-│   │   ├── messages.ts             # Send / receive / retry queue / status updates
+│   │   ├── messages.ts             # Optimistic send, retry queue, drainPending, updateStatus
 │   │   └── groups.ts               # Group CRUD, Sender Key distribute/encrypt/decrypt
 │   │
 │   ├── composables/
-│   │   ├── useWebSocket.ts         # WS singleton — receipts, gap detection, drain
-│   │   ├── useServerApi.ts         # Typed fetch — all API endpoints incl. invites
+│   │   ├── useWebSocket.ts         # WS singleton, ack/read receipts, gap detection, drain
+│   │   ├── useServerApi.ts         # Typed fetch — all endpoints incl. createInvite/redeemInvite
 │   │   ├── useOpkReplenishment.ts  # OPK pool check → generate → upload
 │   │   ├── useDisappearingMessages.ts # TTL timers, sweep, countdown
-│   │   └── useCrypto.ts            # Thin Tauri command wrappers
+│   │   └── useCrypto.ts            # Tauri command wrappers
 │   │
 │   ├── views/
-│   │   ├── LoginView.vue           # Google sign-in card
-│   │   ├── AuthCallbackView.vue    # OAuth callback — extracts ?token= from URL
+│   │   ├── LoginView.vue           # Google sign-in
+│   │   ├── AuthCallbackView.vue    # OAuth callback — extracts ?token=, navigates
 │   │   ├── SetupView.vue           # Display name + key generation
-│   │   ├── ChatView.vue            # Two-panel shell (1:1)
-│   │   ├── GroupView.vue           # Group conversation thread
-│   │   ├── SettingsView.vue        # Profile, keys, invite panel, sign out
-│   │   └── InviteView.vue          # Invite acceptance — shows inviter, Add / Decline
+│   │   ├── ChatView.vue            # Two-panel 1:1 shell
+│   │   ├── GroupView.vue           # Group thread (Sender Key composer)
+│   │   ├── SettingsView.vue        # Profile · keys · invite panel · sign out
+│   │   └── InviteView.vue          # Invite acceptance — inviter card, Add / Decline
 │   │
 │   └── components/
-│       ├── ConversationList.vue    # Sidebar — Direct/Groups tabs, new dialogs
-│       └── MessageThread.vue      # 1:1 bubbles + delivery status + disappear timer
+│       ├── ConversationList.vue    # Sidebar — tabs, Gmail import, new dialogs
+│       └── MessageThread.vue      # Bubbles + delivery status + disappear timer
 │
 └── src-tauri/                      # ── Tauri Rust backend ───────────────────
-    ├── Cargo.toml                  # cdylib + staticlib + rlib (desktop + Android)
-    ├── tauri.conf.json             # engage:// desktop + App Links mobile deep links
+    ├── Cargo.toml                  # cdylib + staticlib + rlib (desktop + Android/iOS)
+    ├── tauri.conf.json             # engage:// (desktop) + App Links (Android/iOS)
+    ├── gen/android/                # Generated Android Studio / Gradle project
     └── src/
-        ├── lib.rs                  # App setup, SQLite init, command registry
+        ├── lib.rs                  # App init, SQLite open, command registry, deep-link setup
         ├── crypto/
-        │   ├── x3dh.rs             # X3DH key agreement (initiator + recipient)
-        │   ├── ratchet.rs          # Double Ratchet (encrypt/decrypt, skipped keys)
-        │   ├── session.rs          # Session manager — X3DH→Ratchet, persists to SQLite
-        │   ├── sender_key.rs       # Sender Keys — group encrypt/decrypt, ratchet
+        │   ├── x3dh.rs             # X3DH (initiator + recipient)
+        │   ├── ratchet.rs          # Double Ratchet (encrypt/decrypt, skipped-key cache)
+        │   ├── session.rs          # Session manager — X3DH→Ratchet, persisted to SQLite
+        │   ├── sender_key.rs       # Sender Keys — group encrypt/decrypt + ratchet
         │   ├── identity.rs         # Identity bundle generation
-        │   └── keys.rs             # X25519 / Ed25519 helpers
+        │   └── keys.rs             # X25519 / Ed25519 key helpers
         ├── commands/
         │   ├── identity.rs         # create_identity, get_identity
         │   ├── contacts.rs         # list/add/remove_contact
-        │   ├── messages.rs         # list/send/update_status + pending queue commands
+        │   ├── messages.rs         # list/send/update_message_status
+        │   │                       # queue/list/remove/increment_pending_message
         │   ├── crypto.rs           # init_session, init_inbound_session,
         │   │                       # encrypt/decrypt_message, generate_prekey_bundle
         │   ├── prekeys.rs          # get_opk_status, generate_and_store_opks
         │   ├── disappear.rs        # get/set_disappear_timer, sweep_expired_messages
         │   └── groups.rs           # cache_group, encrypt/decrypt_group_message,
         │                           # get/store_sender_key_distribution
-        └── storage/db.rs           # SQLite schema + WAL migrations (pending_messages, etc.)
+        └── storage/db.rs           # WAL SQLite migrations (messages, pending_messages,
+                                    # sender_keys, seq_counters — server-side)
 ```
 
 ---
@@ -354,7 +344,7 @@ git clone --branch engage-server git@github.com:faridguzman91/rust-engage.git en
 
 # Configure server credentials
 cd engage-server && cp .env.example .env
-# Edit .env: fill in GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, JWT_SECRET, FRONTEND_URL
+# Edit .env: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, JWT_SECRET, FRONTEND_URL
 
 # Start server + client simultaneously
 cd ../engage && make dev
@@ -363,7 +353,7 @@ cd ../engage && make dev
 ### Option B — Docker Compose (server) + native client
 
 ```bash
-cd engage && make docker-up   # server in container
+cd engage && make docker-up   # relay server in container
 make client                   # Tauri desktop client
 ```
 
@@ -377,8 +367,8 @@ See step-by-step instructions below.
 
 | Tool | Version | Notes |
 |---|---|---|
-| Rust | ≥ 1.76 | Install via [rustup](https://rustup.rs) |
-| Node.js | ≥ 18.12 | Recommend Node 22 LTS via [nvm](https://github.com/nvm-sh/nvm) |
+| Rust | ≥ 1.76 | Via [rustup](https://rustup.rs) |
+| Node.js | ≥ 18.12 | Node 22 LTS via [nvm](https://github.com/nvm-sh/nvm) recommended |
 | **pnpm** | **≥ 9** | npm is not used |
 | Docker | 24+ | Only for `make docker-up` |
 | C linker | — | **macOS:** Xcode CLT · **Windows:** GCC 14 via scoop · **Linux:** `build-essential` |
@@ -393,21 +383,21 @@ corepack enable && corepack prepare pnpm@9.15.9 --activate
 ```
 
 **Gotchas:**
-- `._*` resource forks — if cloning to an exFAT volume run `find . -name "._*" -delete` before building
-- `engage://` deep link — declared statically in `Info.plist` via `tauri.conf.json`; no runtime registration needed on macOS
+- `._*` resource forks — on exFAT volumes run `find . -name "._*" -delete` before building
+- `engage://` deep link — declared in `Info.plist` via `tauri.conf.json`; no runtime registration needed on macOS
 
 ### Windows toolchain
 
-This project targets `x86_64-pc-windows-gnu`. Visual Studio Build Tools are **not** required.
+Targets `x86_64-pc-windows-gnu` — Visual Studio Build Tools **not** required.
 
 ```powershell
 scoop install mingw nodejs-lts
 corepack enable && corepack prepare pnpm@9.15.9 --activate
 rustup toolchain install stable-x86_64-pc-windows-gnu
-rustup override set stable-x86_64-pc-windows-gnu   # run inside src-tauri/
+rustup override set stable-x86_64-pc-windows-gnu   # inside src-tauri/
 ```
 
-`.cargo/config.toml` applies `-fuse-ld=lld` (rust-lld) automatically for this target, which resolves the Windows PE ordinal limit — `cdylib` is now safe to include alongside `staticlib` and `rlib`.
+`.cargo/config.toml` applies `-fuse-ld=lld` automatically — resolves the Windows PE ordinal limit so `cdylib` can be included alongside `staticlib` and `rlib`.
 
 ---
 
@@ -428,13 +418,13 @@ git clone git@github.com:faridguzman91/rust-engage.git
 
 **Required APIs:** Google People API (Gmail import) · Google Identity (OAuth)
 
-**Consent screen scopes:** `openid` · `email` · `profile` · `https://www.googleapis.com/auth/contacts.readonly`
+**Consent scopes:** `openid` · `email` · `profile` · `https://www.googleapis.com/auth/contacts.readonly`
 
 ### 3. Configure and start the relay server
 
 ```bash
 git clone --branch engage-server git@github.com:faridguzman91/rust-engage.git engage-server
-cd engage-server && cp .env.example .env   # fill in credentials
+cd engage-server && cp .env.example .env
 cargo run
 ```
 
@@ -448,25 +438,23 @@ pnpm tauri dev
 ### 5. First run
 
 ```
-Launch app → /login → "Continue with Google"
-  └─► Google consent → Server issues JWT → /#/auth?token=JWT
-        └─► AuthCallbackView stores token → /setup
-              └─► Enter display name → keys generated + registered
-                    └─► /chat → Ready to message
+Launch → /login → "Continue with Google"
+  └─► Google consent → JWT issued → /#/auth?token=JWT
+        └─► /setup → enter display name → keys generated + registered
+              └─► /chat — ready to message
 ```
 
 ---
 
 ## Configuration
 
-### Frontend
+### Frontend (`.env.local`)
 
-```env
-# .env.local
-VITE_SERVER_URL=http://localhost:3000
-```
+| Variable | Desktop | Android emulator | Android device |
+|---|---|---|---|
+| `VITE_SERVER_URL` | `http://localhost:3000` | `http://10.0.2.2:3000` | `http://<LAN-IP>:3000` |
 
-### Server
+### Server (`.env`)
 
 | Variable | Description |
 |---|---|
@@ -481,12 +469,10 @@ Full reference: [engage-server/.env.example](https://github.com/faridguzman91/ru
 
 ## Gmail contact import
 
-The **Find from Gmail** button discovers which of your Gmail contacts are already on engage.
-
 ```
-Client (JWT) → GET /api/contacts/suggest
+Client → GET /api/contacts/suggest
   Server: load access_token → refresh if expired → GET People API
-  Cross-reference emails against devices table (excludes self + unregistered)
+  Cross-reference emails vs. devices table (excludes self + unregistered)
   ← [{ userId, displayName, identityKey, email }]
 User clicks "Add" → addContact(ik, name) → X3DH session init on next message
 ```
@@ -500,31 +486,36 @@ pnpm tauri build
 # Binaries → src-tauri/target/release/bundle/
 ```
 
-For production: use HTTPS, remove `FRONTEND_URL` (falls back to `engage://` deep link), run the server behind nginx/Caddy.
+Use HTTPS, remove `FRONTEND_URL` (falls back to `engage://` deep link), run server behind nginx/Caddy.
 
 ---
 
 ## Android build
 
-See [ANDROID.md](ANDROID.md) for the full setup guide. Quick version:
+The Android Gradle project (`src-tauri/gen/android/`) is already generated and committed. See [ANDROID.md](ANDROID.md) for the full guide. Quick version:
 
 ```bash
 # 1. Install Android Studio + NDK 30, set ANDROID_HOME + NDK_HOME
-# 2. Add Rust Android targets
+# 2. Install Rust Android targets
 rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
 cargo install cargo-ndk --locked
 
-# 3. Generate Gradle project (once)
-make android-init
+# 3. Set server URL in .env.local (localhost won't reach from device)
+echo "VITE_SERVER_URL=http://10.0.2.2:3000" >> .env.local   # emulator
+# echo "VITE_SERVER_URL=http://192.168.x.x:3000" >> .env.local  # physical device
 
-# 4. Dev build on connected device / emulator
-make android-dev
+# 4. Enable Windows Developer Mode (Settings → System → For developers)
+#    Required for symlink creation during APK packaging
 
-# 5. Release APK
+# 5. Build debug APK
 make android-build
+# APK → src-tauri/gen/android/app/build/outputs/apk/debug/
+
+# 6. Dev build with hot-reload on connected device / emulator
+make android-dev
 ```
 
-CI builds a debug APK on every push — see `.github/workflows/android.yml`.
+CI builds a debug APK on every push — artifacts available in GitHub Actions for 14 days.
 
 ---
 
@@ -533,19 +524,19 @@ CI builds a debug APK on every push — see `.github/workflows/android.yml`.
 | Layer | Technology |
 |---|---|
 | Desktop + Android shell | [Tauri 2](https://tauri.app) |
-| Frontend framework | [Vue 3](https://vuejs.org) + TypeScript |
-| UI component library | [PrimeVue 4](https://primevue.org) — Aura preset + PrimeIcons |
-| State management | [Pinia](https://pinia.vuejs.org) |
-| Routing | [Vue Router 4](https://router.vuejs.org) |
+| Frontend | [Vue 3](https://vuejs.org) + TypeScript |
+| UI library | [PrimeVue 4](https://primevue.org) — Aura preset + PrimeIcons |
+| State | [Pinia](https://pinia.vuejs.org) |
+| Router | [Vue Router 4](https://router.vuejs.org) |
 | QR codes | [qrcode](https://github.com/soldair/node-qrcode) |
-| Package manager | [pnpm](https://pnpm.io) |
-| Build tool | [Vite](https://vitejs.dev) |
+| Packages | [pnpm](https://pnpm.io) |
+| Build | [Vite](https://vitejs.dev) |
 | Crypto (1:1) | X3DH + Double Ratchet — `x25519-dalek`, `ed25519-dalek`, `aes-gcm`, `hkdf` |
 | Crypto (groups) | Sender Keys — AES-256-GCM + HKDF ratchet |
 | Auth | Google OAuth 2.0 + HS256 JWT |
-| Local storage | SQLite via [rusqlite](https://github.com/rusqlite/rusqlite) (bundled) |
+| Local DB | SQLite via [rusqlite](https://github.com/rusqlite/rusqlite) (bundled) |
 | Relay server | [Axum 0.7](https://github.com/tokio-rs/axum) + Tokio |
-| Containerisation | Docker + Docker Compose |
+| Containers | Docker + Docker Compose |
 
 ---
 
@@ -558,11 +549,11 @@ CI builds a debug APK on every push — see `.github/workflows/android.yml`.
 | `make client` | Start Tauri desktop client only |
 | `make install` | Install / update frontend dependencies |
 | `make build` | Production desktop build |
-| `make android-init` | Generate `src-tauri/gen/android/` (run once after SDK setup) |
-| `make android-dev` | Live-reload dev build on connected Android device or emulator |
-| `make android-build` | Build release APK |
-| `make docker-up` | Start server via Docker Compose |
-| `make docker-down` | Stop Docker Compose services |
+| `make android-init` | Re-generate `src-tauri/gen/android/` (only needed after `tauri.conf.json` changes) |
+| `make android-dev` | Live-reload build on connected Android device or emulator |
+| `make android-build` | Build debug APK |
+| `make docker-up` | Start relay server via Docker Compose |
+| `make docker-down` | Stop Docker Compose |
 | `make clean` | Remove Rust + frontend build artefacts |
 
 ---
@@ -570,7 +561,7 @@ CI builds a debug APK on every push — see `.github/workflows/android.yml`.
 ## Roadmap
 
 - [x] **E2E encryption** — X3DH + Double Ratchet (forward secrecy, break-in recovery)
-- [x] **Authentication** — Google OAuth 2.0 + HS256 JWT; all routes and WebSocket connections protected
+- [x] **Authentication** — Google OAuth 2.0 + HS256 JWT; all routes and WS connections protected
 - [x] **Relay server** — zero-knowledge Axum server; stores and forwards sealed envelopes only
 - [x] **Offline message drain** — messages queued server-side; delivered on reconnect
 - [x] **OPK replenishment** — auto-upload 100 fresh OPKs when pool drops below 10
@@ -579,39 +570,38 @@ CI builds a debug APK on every push — see `.github/workflows/android.yml`.
 - [x] **Group messaging** — Sender Keys (Signal-style); one encrypt, server fans out
 - [x] **Gmail contact import** — "Find from Gmail" via Google People API
 
-### Message Sending — Reliability & Status
+### Message Reliability
 
-- [x] **Delivery receipts** — server forwards `ack` from recipient; `sent → delivered`
-- [x] **Read receipts** — emitted when recipient opens thread; `delivered → read`
-- [x] **Retry queue** — `pending_messages` table; drained on every WS reconnect; crash-safe
-- [x] **Message ordering** — `seq_counters` per recipient; gap detection triggers offline drain
+- [x] **Delivery receipts** — `ack` forwarded from recipient to sender; `sent → delivered`
+- [x] **Read receipts** — emitted when thread opened; `delivered → read`
+- [x] **Retry queue** — `pending_messages` table; crash-safe; drained on every WS reconnect
+- [x] **Sequence numbers** — `seq_counters` per recipient; gap detection triggers offline drain
 
 ### Invites
 
-- [x] **Invite links** — `POST /api/invites` issues 24h token; `GET /api/invites/:token` (public) returns inviter bundle; deep link handled in `App.vue`
+- [x] **Invite links** — `POST /api/invites` (24h token); `GET /api/invites/:token` (public); deep link via `onOpenUrl`
 - [x] **QR code** — rendered in Settings with brand colours
 - [x] **Share sheet** — copy, `mailto:`, `sms:` via `tauri-plugin-opener`
 
 ### Android Port
 
-- [x] `cdylib` re-enabled — Windows PE limit resolved via `rust-lld`
-- [x] App Links configured — `https://engage.app/auth` + `/invite` in `tauri.conf.json`; `android:autoVerify="true"` in generated `AndroidManifest.xml`
-- [x] SQLite path — `app_data_dir()` resolves to `/data/data/com.engage.app/files/` on Android
-- [x] CI pipeline — `.github/workflows/android.yml` builds debug APK on every push (NDK 30, 4 ABI targets)
-- [x] Makefile targets — `android-init`, `android-dev`, `android-build`; rustup PATH fix for Windows Scoop users baked in
-- [x] Android Gradle project generated and committed — `src-tauri/gen/android/`; `minSdkVersion=24`, `INTERNET` permission, edge-to-edge, cleartext traffic only in debug
-- [x] All TypeScript + config errors fixed — `scheme: ["https"]`, `onOpenUrl`, `openUrl`, missing npm packages installed
+- [x] `cdylib` crate type re-enabled — Windows PE limit resolved via `rust-lld`
+- [x] App Links — `https://engage.app/auth` + `/invite`; `android:autoVerify="true"` in `AndroidManifest.xml`
+- [x] SQLite path — `app_data_dir()` resolves to `/data/data/com.engage.app/files/`
+- [x] Android Gradle project generated and committed — `minSdkVersion=24`, INTERNET permission, edge-to-edge
 - [x] Rust cross-compilation verified — `aarch64-linux-android` compiles successfully
-- [x] [`ANDROID.md`](ANDROID.md) — full guide: SDK/NDK setup, fingerprint (3 methods), OAuth client, `assetlinks.json`, `VITE_SERVER_URL` per target, signing, CI, troubleshooting
-- [ ] **Enable Windows Developer Mode** — final step to complete APK packaging (`Settings → System → For developers`)
-- [ ] Set `VITE_SERVER_URL=http://10.0.2.2:3000` in `.env.local` for emulator / LAN IP for device
-- [ ] Register Android OAuth 2.0 Client ID in Google Cloud Console with SHA-1 fingerprint
-- [ ] Deploy `assetlinks.json` to `https://engage.app/.well-known/` with SHA-256 fingerprint
+- [x] CI pipeline — `.github/workflows/android.yml` (NDK 30, 4 ABI targets, debug APK artifact)
+- [x] Makefile targets + rustup PATH fix for Windows Scoop installs
+- [x] [`ANDROID.md`](ANDROID.md) — SDK/NDK setup, fingerprints (3 methods), OAuth client, `assetlinks.json`, server URL per target, signing, troubleshooting
+- [ ] Enable **Windows Developer Mode** — `Settings → System → For developers` (symlink requirement)
+- [ ] Set `VITE_SERVER_URL` for emulator / device in `.env.local`
+- [ ] Register Android OAuth 2.0 Client ID in Google Cloud Console (SHA-1 fingerprint)
+- [ ] Deploy `assetlinks.json` to `https://engage.app/.well-known/` (SHA-256 fingerprint)
 
 ### iOS Port
 
-- [ ] Add Rust targets: `aarch64-apple-ios`, `x86_64-apple-ios`, `aarch64-apple-ios-sim`
-- [ ] Run `pnpm tauri ios init` → generate Xcode project under `src-tauri/gen/ios/`
+- [ ] Rust targets: `aarch64-apple-ios`, `x86_64-apple-ios`, `aarch64-apple-ios-sim`
+- [ ] `pnpm tauri ios init` → generate Xcode project under `src-tauri/gen/ios/`
 - [ ] OAuth: `engage://` URL scheme reuses macOS `Info.plist` config
 - [ ] Keychain: replace `localStorage` JWT storage with Tauri `stronghold` or `keychain` plugin
 - [ ] Provisioning: Apple Developer account, bundle ID `app.engage.client`
@@ -620,9 +610,9 @@ CI builds a debug APK on every push — see `.github/workflows/android.yml`.
 ### Voice / Video Calls (STUN/TURN NAT Traversal)
 
 - [ ] WS signaling — `CallOffer`, `CallAnswer`, `IceCandidate`, `CallHangup` envelope types
-- [ ] `useWebRTC.ts` composable — `RTCPeerConnection`, ICE, offer/answer over WS
-- [ ] `CallView.vue` — incoming call dialog, `<video>` elements, mute/hang-up
-- [ ] Wire up `pi-phone` / `pi-video` buttons in `MessageThread` header
+- [ ] `useWebRTC.ts` — `RTCPeerConnection`, ICE gathering, offer/answer over WS
+- [ ] `CallView.vue` — incoming call dialog, `<video>` elements, mute/hang-up controls
+- [ ] Wire `pi-phone` / `pi-video` buttons in `MessageThread` header (currently rendered, no-op)
 - [ ] STUN — `stun:stun.l.google.com:19302` for development
 - [ ] TURN — deploy `coturn` on VPS (`lt-cred-mechanism`, `realm=engage.app`)
 - [ ] Short-lived TURN credentials — `/api/turn-credentials` HMAC-SHA1 tokens (24h TTL)
@@ -637,4 +627,4 @@ CI builds a debug APK on every push — see `.github/workflows/android.yml`.
 - [ ] `group-svc` — group CRUD, Sender Key distribution, fan-out
 - [ ] `turn-svc` — TURN credential issuance
 - [ ] API gateway — JWT middleware + service routing (nginx or Axum tower)
-- [ ] Migration path — `auth-svc` first, then `key-svc`, then `relay-svc` + `ws-svc` together
+- [ ] Migration path — `auth-svc` first → `key-svc` → `relay-svc` + `ws-svc` together
