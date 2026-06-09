@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2024-2026 Farid Guzman <https://github.com/faridguzman91>
+
 // @faridguzman91: OPK (One-Time PreKey) replenishment composable.
 //
 // One-time prekeys provide forward secrecy for the first message in an X3DH session.

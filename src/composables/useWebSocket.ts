@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2024-2026 Farid Guzman <https://github.com/faridguzman91>
+
 // @faridguzman: WebSocket singleton — one persistent connection per app session.
 // Handles:
 //   - JWT auth via ?token= query param (WebSocket handshakes can't send headers)

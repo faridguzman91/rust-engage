@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2024-2026 Farid Guzman <https://github.com/faridguzman91>
+
 // @faridguzman91: Groups store — manages group chat state.
 //
 // Groups use Sender Keys (see crypto/sender_key.rs):

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2024-2026 Farid Guzman <https://github.com/faridguzman91>
+
 // @faridguzman: Vue Router with two-layer guards — auth (JWT present?) then identity (keys set up?).
 // Hash history is used so the Tauri webview and Vite dev server both handle routing consistently.
 import { createRouter, createWebHashHistory } from "vue-router";

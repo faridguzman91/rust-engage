@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2024-2026 Farid Guzman <https://github.com/faridguzman91>
+
 // @faridguzman: Typed fetch wrapper for the relay server.
 // Automatically attaches the Bearer JWT to every request.
 // On 401 (token expired/revoked), clears localStorage and redirects to /login.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2024-2026 Farid Guzman <https://github.com/faridguzman91>
+
 // @faridguzman: TURN credential issuance for WebRTC NAT traversal.
 //
 // Uses the standard coturn lt-cred-mechanism (long-term credential mechanism

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2024-2026 Farid Guzman <https://github.com/faridguzman91>
+
 // @faridguzman91: Thin TypeScript wrappers over the Tauri crypto commands.
 // The actual cryptography runs in Rust (src-tauri/src/crypto/) where it has access
 // to native OS entropy, persistent key storage, and no JavaScript sandbox limits.

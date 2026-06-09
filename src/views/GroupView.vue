@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!-- Copyright (C) 2024-2026 Farid Guzman <https://github.com/faridguzman91> -->
 <script setup lang="ts">
 // @faridguzman91: Group conversation thread — mirrors MessageThread but uses
 // Sender Key encryption and shows member avatars in the header.

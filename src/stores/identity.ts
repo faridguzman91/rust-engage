@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2024-2026 Farid Guzman <https://github.com/faridguzman91>
+
 // @faridguzman: Identity store — manages the user's local crypto keys.
 // On first run (after OAuth) the user picks a display name and this store:
 //   1. Generates Ed25519 + X25519 key pairs locally via Tauri (never leaves the device unencrypted)

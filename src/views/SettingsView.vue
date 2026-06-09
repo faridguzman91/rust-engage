@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
+<!-- Copyright (C) 2024-2026 Farid Guzman <https://github.com/faridguzman91> -->
 <script setup lang="ts">
 // @faridguzman: Settings view — profile, identity keys, invite generation, sign out.
 import { ref } from "vue";

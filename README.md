@@ -4,6 +4,8 @@
 
 ---
 
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
+
 End-to-end encrypted chat — desktop (Windows / macOS / Linux) and Android. Built with Tauri 2, Vue 3, and Rust.
 
 ![engage chat UI](screenshot.png)
@@ -617,6 +619,26 @@ CI builds a debug APK on every push — artifacts available in GitHub Actions fo
 - [x] TURN credential endpoint — `GET /api/turn-credentials` issues HMAC-SHA1 short-term credentials (24h TTL, `lt-cred-mechanism`); gracefully omitted when `TURN_SECRET` not set
 - [ ] Deploy `coturn` on VPS (`lt-cred-mechanism`, `realm=engage.app`, set `TURN_SECRET` env var)
 - [ ] Media E2EE — AES-GCM insertable streams on top of mandatory DTLS-SRTP (post-coturn)
+
+## Licence
+
+Copyright (C) 2024–2026 **Farid Guzman** — [github.com/faridguzman91](https://github.com/faridguzman91)
+
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.
+
+You are free to use, study, modify, and distribute engage under the terms of the AGPLv3. The key condition: **if you run a modified version of engage as a network service (e.g. a hosted chat platform), you must make your modifications available under the same licence.**
+
+This means:
+- ✅ Personal use, study, and self-hosting — always free
+- ✅ Forking and contributing back — welcome
+- ✅ Building on engage for open-source projects — allowed
+- ❌ Forking and running as a closed-source commercial service — not permitted without a separate agreement
+
+For commercial licensing enquiries (e.g. embedding engage in a proprietary product), contact the author via GitHub.
+
+See the full licence text in [LICENSE](LICENSE).
+
+---
 
 ### Microservices Decomposition
 

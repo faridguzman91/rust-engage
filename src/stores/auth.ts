@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2024-2026 Farid Guzman <https://github.com/faridguzman91>
+
 // @faridguzman91: Auth store — holds the JWT issued after Google OAuth.
 // Token is persisted in localStorage so the user stays logged in across restarts.
 //

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2024-2026 Farid Guzman <https://github.com/faridguzman91>
+
 // @faridguzman: Contacts store — CRUD for the contact list plus X3DH session management.
 // The first time a message is sent to a contact, ensureSession() fetches their prekey bundle
 // from the server, runs X3DH locally, and seeds the Double Ratchet. The ephemeral key

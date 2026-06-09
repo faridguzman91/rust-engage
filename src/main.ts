@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2024-2026 Farid Guzman <https://github.com/faridguzman91>
+
 // @faridguzman91: App entry point — wires PrimeVue 4 (Aura dark theme), Pinia, and Vue Router.
 // Dark mode is class-based (.dark on <html>) so PrimeVue tokens respond correctly.
 import { createApp } from "vue";

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2024-2026 Farid Guzman <https://github.com/faridguzman91>
+
 use serde::{Deserialize, Serialize};
 
 // @faridguzman: userId is intentionally absent — the server derives it from the

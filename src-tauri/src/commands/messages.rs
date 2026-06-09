@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2024-2026 Farid Guzman <https://github.com/faridguzman91>
+
 // @faridguzman: Tauri commands for local message persistence.
 // send_message respects the conversation's disappear timer — if disappear_after_secs > 0
 // the row is inserted with expires_at = now + ttl so sweep_expired_messages removes it later.

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2024-2026 Farid Guzman <https://github.com/faridguzman91>
+
 // @faridguzman: SQLite database setup with WAL mode and auto-migration.
 // All tables use CREATE TABLE IF NOT EXISTS so migrations are additive and
 // safe to run on every startup without wiping existing data.
