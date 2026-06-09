@@ -38,16 +38,22 @@ Then set the environment variables in your shell profile (`~/.bashrc`, `~/.zshrc
 ```bash
 export ANDROID_HOME="$HOME/Library/Android/sdk"          # macOS default
 # export ANDROID_HOME="$HOME/Android/Sdk"                # Linux default
-export NDK_HOME="$ANDROID_HOME/ndk/27.0.11902837"
+export NDK_HOME="$ANDROID_HOME/ndk/30.0.14904198"
 export PATH="$ANDROID_HOME/tools:$ANDROID_HOME/platform-tools:$PATH"
 ```
 
 **Windows (PowerShell profile)**
 ```powershell
 $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
-$env:NDK_HOME     = "$env:ANDROID_HOME\ndk\27.0.11902837"
+$env:NDK_HOME     = "$env:ANDROID_HOME\ndk\30.0.14904198"
 $env:PATH         = "$env:ANDROID_HOME\platform-tools;$env:PATH"
 ```
+
+> **Scoop users — rustup PATH fix:** If you installed Rust via `scoop install rust` and also have `scoop install rustup`, the `rustup.exe` binary may not be on PATH (scoop only shims one cargo). `pnpm tauri android` needs `rustup` to install cross-compilation targets. The Makefile already prepends the correct path automatically. If running Tauri commands directly from PowerShell, prepend it manually:
+> ```powershell
+> $env:PATH = "$env:USERPROFILE\scoop\apps\rustup\current\.cargo\bin;$env:PATH"
+> pnpm tauri android init
+> ```
 
 Verify:
 ```bash

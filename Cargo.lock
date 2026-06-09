@@ -319,6 +319,7 @@ dependencies = [
  "dashmap",
  "dotenvy",
  "futures-util",
+ "getrandom 0.4.2",
  "jsonwebtoken",
  "rand",
  "reqwest",

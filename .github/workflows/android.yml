@@ -20,7 +20,7 @@ on:
     branches: [master]
 
 env:
-  NDK_VERSION: "27.0.11902837"
+  NDK_VERSION: "30.0.14904198"
   JAVA_VERSION: "17"
   NODE_VERSION: "22"
   PNPM_VERSION: "9.15.9"
@@ -52,6 +52,8 @@ jobs:
             "ndk;${{ env.NDK_VERSION }}" \
             "platforms;android-35" \
             "build-tools;35.0.0"
+        # @faridguzman: NDK 30 matches the locally installed version so debug
+        # and CI builds use the same NDK ABI / linker behaviour.
 
       - name: Export NDK_HOME
         run: echo "NDK_HOME=$ANDROID_HOME/ndk/${{ env.NDK_VERSION }}" >> $GITHUB_ENV

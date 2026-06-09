@@ -22,6 +22,21 @@ PNPM        := pnpm
 CARGO_TARGET_DIR := $(HOME)/.cargo-targets/engage
 export CARGO_TARGET_DIR
 
+# @faridguzman: On Windows with Scoop, rustup lives in a separate package whose
+# .cargo/bin is not automatically added to PATH.  Prepend it so `pnpm tauri android`
+# commands can find `rustup`, `cargo-ndk`, and the Android-target Rust std libraries.
+# The path is a no-op on macOS/Linux where rustup is typically on PATH already.
+RUSTUP_CARGO_BIN := $(USERPROFILE)/.cargo/bin
+SCOOP_RUSTUP_BIN := $(USERPROFILE)/scoop/apps/rustup/current/.cargo/bin
+export PATH := $(SCOOP_RUSTUP_BIN):$(RUSTUP_CARGO_BIN):$(PATH)
+
+# Android SDK / NDK — auto-detected by Tauri if ANDROID_HOME is set.
+# Tauri also accepts the NDK path via NDK_HOME when multiple NDK versions are installed.
+ANDROID_HOME ?= $(LOCALAPPDATA)/Android/Sdk
+NDK_HOME     ?= $(ANDROID_HOME)/ndk/30.0.14904198
+export ANDROID_HOME
+export NDK_HOME
+
 # If nvm is present, prepend the latest Node 22 bin dir so make doesn't fall
 # back to the system Node (which may be too old for pnpm 9).
 NVM_NODE22 := $(shell ls -d $(HOME)/.nvm/versions/node/v22.* 2>/dev/null | sort -V | tail -1)

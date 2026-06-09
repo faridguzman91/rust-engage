@@ -509,7 +509,7 @@ For production: use HTTPS, remove `FRONTEND_URL` (falls back to `engage://` deep
 See [ANDROID.md](ANDROID.md) for the full setup guide. Quick version:
 
 ```bash
-# 1. Install Android Studio + NDK 27, set ANDROID_HOME + NDK_HOME
+# 1. Install Android Studio + NDK 30, set ANDROID_HOME + NDK_HOME
 # 2. Add Rust Android targets
 rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
 cargo install cargo-ndk --locked
@@ -600,7 +600,7 @@ CI builds a debug APK on every push — see `.github/workflows/android.yml`.
 - [x] CI pipeline — `.github/workflows/android.yml` builds debug APK on every push
 - [x] Makefile targets — `android-init`, `android-dev`, `android-build`
 - [x] [`ANDROID.md`](ANDROID.md) — complete setup guide
-- [ ] Developer environment — `rustup target add aarch64-linux-android ...`, SDK + NDK 27, set `ANDROID_HOME` + `NDK_HOME`
+- [ ] Developer environment — `rustup target add aarch64-linux-android ...`, SDK + NDK 30, set `ANDROID_HOME` + `NDK_HOME`
 - [ ] Run `make android-init` to generate `src-tauri/gen/android/`
 - [ ] Get SHA-256 fingerprint via Android Studio **Gradle → signingReport** or `keytool` (see [ANDROID.md §5](ANDROID.md#5-get-your-sha-256-certificate-fingerprint))
 - [ ] Register fingerprint: Android OAuth 2.0 Client ID in Google Cloud Console + `assetlinks.json` on `https://engage.app/.well-known/`
