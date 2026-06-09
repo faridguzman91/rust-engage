@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-// @faridguzman91: userId is intentionally absent — the server derives it from the
+// @faridguzman: userId is intentionally absent — the server derives it from the
 // JWT claims.sub so the client cannot forge or override their own identity.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RegisterRequest {
@@ -71,6 +71,10 @@ pub struct StoredMessage {
     pub otpk_id: Option<u32>,
     pub ciphertext: String,
     pub timestamp: i64,
+    /// @faridguzman: Monotonically increasing per-recipient sequence number.
+    /// NULL for messages stored before Phase 3 — clients treat None as 0.
+    #[serde(rename = "seqNum")]
+    pub seq_num: Option<i64>,
 }
 
 // ── Group models ─────────────────────────────────────────────────────────────
@@ -109,7 +113,7 @@ pub struct AddMemberRequest {
     pub user_id: String,
 }
 
-/// @faridguzman91: Group message request — carries group_id instead of recipient_id.
+/// @faridguzman: Group message request — carries group_id instead of recipient_id.
 /// The server fans out to every member except the sender.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SendGroupMessageRequest {
@@ -133,6 +137,9 @@ pub struct GroupStoredMessage {
     pub sender_ik: String,
     pub ciphertext: String,
     pub timestamp: i64,
+    /// @faridguzman: Per-recipient sequence number (same counter as 1:1 messages).
+    #[serde(rename = "seqNum")]
+    pub seq_num: Option<i64>,
 }
 
 /// Envelope pushed over the WebSocket to a connected client.

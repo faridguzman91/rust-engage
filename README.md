@@ -504,10 +504,10 @@ For production: use HTTPS, remove `FRONTEND_URL` (uses `engage://` deep-link), r
 
 ### Message Sending — Reliability & Status
 
-- [ ] **Delivery receipts** — server emits `ack` on relay; client marks `sent → delivered`
-- [ ] **Read receipts** — client emits `read` event when message scrolls into view; persist `read_at` in SQLite
-- [ ] **Retry queue** — outbound messages queued in SQLite `pending_messages` when WS is offline, drained on reconnect
-- [ ] **Message ordering** — add `sequence_num` per conversation; detect gaps and re-request missing messages
+- [x] **Delivery receipts** — server emits `ack` on relay; client marks `sent → delivered`
+- [x] **Read receipts** — client emits `read` event when message scrolls into view; persist `read_at` in SQLite
+- [x] **Retry queue** — outbound messages queued in SQLite `pending_messages` when WS is offline, drained on reconnect
+- [x] **Message ordering** — per-recipient `seq_counters` table; `sequence_num` stamped on every envelope; client detects gaps and drains server queue to recover missed messages
 
 ### Invites
 

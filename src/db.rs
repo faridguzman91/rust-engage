@@ -46,6 +46,15 @@ fn migrate(conn: &Connection) -> Result<()> {
         );
         CREATE INDEX IF NOT EXISTS idx_msg_recipient ON messages(recipient_id, delivered, timestamp);
 
+        -- @faridguzman: Per-recipient sequence counter.
+        -- Every message addressed to a given user (1:1 or group fan-out) increments
+        -- that user's counter.  The assigned sequence_num is stored on the message row
+        -- and pushed to the client so it can detect gaps in delivery.
+        CREATE TABLE IF NOT EXISTS seq_counters (
+            recipient_id TEXT PRIMARY KEY,
+            last_seq     INTEGER NOT NULL DEFAULT 0
+        );
+
         -- Google OAuth: maps google_sub → user_id (set after first OAuth login)
         CREATE TABLE IF NOT EXISTS oauth_accounts (
             google_sub  TEXT PRIMARY KEY,
@@ -59,7 +68,7 @@ fn migrate(conn: &Connection) -> Result<()> {
             created_at  INTEGER NOT NULL
         );
 
-        -- @faridguzman91: Group chat tables
+        -- @faridguzman: Group chat tables
         CREATE TABLE IF NOT EXISTS groups (
             id          TEXT PRIMARY KEY,
             name        TEXT NOT NULL,
@@ -67,7 +76,7 @@ fn migrate(conn: &Connection) -> Result<()> {
             created_at  INTEGER NOT NULL
         );
 
-        -- @faridguzman91: Group membership — one row per (group, member) pair.
+        -- @faridguzman: Group membership — one row per (group, member) pair.
         -- identity_key is denormalised here so members can distribute Sender Keys
         -- to each other without an extra prekey lookup.
         CREATE TABLE IF NOT EXISTS group_members (
@@ -82,9 +91,12 @@ fn migrate(conn: &Connection) -> Result<()> {
         ",
     )?;
 
-    // @faridguzman91: Additive migration — add group_id to messages so group fan-out
+    // @faridguzman: Additive migration — add group_id to messages so group fan-out
     // rows can be distinguished from 1:1 messages on the client side.
     add_column_if_missing(conn, "messages", "group_id", "TEXT")?;
+    // @faridguzman: sequence_num — assigned from seq_counters on every insert.
+    // NULL on rows that pre-date this migration; clients treat NULL as seq 0.
+    add_column_if_missing(conn, "messages", "sequence_num", "INTEGER")?;
 
     Ok(())
 }

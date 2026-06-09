@@ -1,4 +1,4 @@
-// @faridguzman91: Group chat routes — create groups, manage members, send group messages.
+// @faridguzman: Group chat routes — create groups, manage members, send group messages.
 //
 // Group message delivery:
 //   The server fans out a group message to every member except the sender.
@@ -16,6 +16,7 @@ use uuid::Uuid;
 
 use crate::auth::Claims;
 use crate::models::*;
+use crate::routes::messages::next_seq;
 use crate::state::AppState;
 
 fn now_ms() -> i64 {
@@ -162,7 +163,7 @@ pub async fn remove_member(
     Extension(claims): Extension<Claims>,
     Path((group_id, user_id)): Path<(String, String)>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    // @faridguzman91: Only the target user (leave) or the group creator (kick) may remove
+    // @faridguzman: Only the target user (leave) or the group creator (kick) may remove
     let db = state.db.lock().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     let creator: String = db
@@ -203,10 +204,16 @@ pub async fn send_group_message(
         .collect::<Result<_, _>>()
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    // @faridguzman91: Fan-out — store one row per recipient so each can fetch independently.
+    // @faridguzman: Fan-out — store one row per recipient so each can fetch independently.
     // The ciphertext is the same for all (Sender Key encryption: one encrypt, N recipients).
+    // Each recipient gets their own sequence number so they can detect delivery gaps.
     for member_id in &member_ids {
         let msg_id = Uuid::new_v4().to_string();
+
+        // Assign next seq for this specific recipient before inserting
+        let seq = next_seq(&db, member_id)
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
         let stored = GroupStoredMessage {
             id: msg_id.clone(),
             group_id: group_id.clone(),
@@ -214,13 +221,14 @@ pub async fn send_group_message(
             sender_ik: req.sender_ik.clone(),
             ciphertext: req.ciphertext.clone(),
             timestamp: ts,
+            seq_num: Some(seq),
         };
 
         db.execute(
             "INSERT INTO messages
-             (id, recipient_id, sender_id, sender_ik, ephemeral_key, otpk_id, ciphertext, timestamp, group_id)
-             VALUES (?1,?2,?3,?4,NULL,NULL,?5,?6,?7)",
-            params![msg_id, member_id, claims.sub, req.sender_ik, req.ciphertext, ts, group_id],
+             (id, recipient_id, sender_id, sender_ik, ephemeral_key, otpk_id, ciphertext, timestamp, group_id, sequence_num)
+             VALUES (?1,?2,?3,?4,NULL,NULL,?5,?6,?7,?8)",
+            params![msg_id, member_id, claims.sub, req.sender_ik, req.ciphertext, ts, group_id, seq],
         )
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 

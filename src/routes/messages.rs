@@ -11,6 +11,22 @@ use crate::auth::Claims;
 use crate::models::*;
 use crate::state::AppState;
 
+/// @faridguzman: Atomically increment and return the next sequence number for
+/// a recipient.  The Mutex<Connection> serialises all DB access so these two
+/// operations are safe without an explicit transaction.
+pub fn next_seq(db: &rusqlite::Connection, recipient_id: &str) -> rusqlite::Result<i64> {
+    db.execute(
+        "INSERT INTO seq_counters (recipient_id, last_seq) VALUES (?1, 1)
+         ON CONFLICT(recipient_id) DO UPDATE SET last_seq = last_seq + 1",
+        rusqlite::params![recipient_id],
+    )?;
+    db.query_row(
+        "SELECT last_seq FROM seq_counters WHERE recipient_id = ?1",
+        rusqlite::params![recipient_id],
+        |r| r.get(0),
+    )
+}
+
 fn now_ms() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -28,6 +44,26 @@ pub async fn send_message(
     let ts = now_ms();
     let sender_id = claims.sub.clone();
 
+    // @faridguzman: Assign the next sequence number for this recipient before
+    // storing or pushing — kept inside the Mutex lock so it's atomic.
+    let seq_num = {
+        let db = state.db.lock().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        let seq = next_seq(&db, &req.recipient_id)
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        db.execute(
+            "INSERT INTO messages
+             (id, recipient_id, sender_id, sender_ik, ephemeral_key, otpk_id, ciphertext, timestamp, sequence_num)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)",
+            params![
+                id, req.recipient_id, sender_id,
+                req.sender_ik, req.ephemeral_key, req.otpk_id,
+                req.ciphertext, ts, seq
+            ],
+        )
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        seq
+    };
+
     let stored = StoredMessage {
         id: id.clone(),
         sender_id: sender_id.clone(),
@@ -36,22 +72,8 @@ pub async fn send_message(
         otpk_id: req.otpk_id,
         ciphertext: req.ciphertext.clone(),
         timestamp: ts,
+        seq_num: Some(seq_num),
     };
-
-    {
-        let db = state.db.lock().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-        db.execute(
-            "INSERT INTO messages
-             (id, recipient_id, sender_id, sender_ik, ephemeral_key, otpk_id, ciphertext, timestamp)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
-            params![
-                id, req.recipient_id, sender_id,
-                req.sender_ik, req.ephemeral_key, req.otpk_id,
-                req.ciphertext, ts
-            ],
-        )
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-    }
 
     if let Some(tx) = state.connections.get(&req.recipient_id) {
         let envelope = WsEnvelope::Message { payload: stored };
@@ -76,7 +98,7 @@ pub async fn fetch_messages(
     let db = state.db.lock().map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     let mut stmt = db
         .prepare(
-            "SELECT id, sender_id, sender_ik, ephemeral_key, otpk_id, ciphertext, timestamp, group_id
+            "SELECT id, sender_id, sender_ik, ephemeral_key, otpk_id, ciphertext, timestamp, group_id, sequence_num
              FROM messages WHERE recipient_id=?1 AND delivered=0 ORDER BY timestamp",
         )
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -91,6 +113,8 @@ pub async fn fetch_messages(
                 otpk_id: row.get(4)?,
                 ciphertext: row.get(5)?,
                 timestamp: row.get(6)?,
+                // row 7 is group_id — skipped here; seq_num is row 8
+                seq_num: row.get(8)?,
             })
         })
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
