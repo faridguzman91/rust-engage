@@ -238,12 +238,30 @@ For **local development without a live domain**, the relay server's Google OAuth
 Create an AVD in Android Studio (**Device Manager → Create Virtual Device**).
 Use a Pixel 7 profile with API 35 (arm64-v8a) for the closest match to real hardware.
 
+### Configure the server URL for Android
+
+`localhost:3000` is unreachable from a device or emulator. Set `VITE_SERVER_URL` in `.env.local` to the correct address before building:
+
+| Target | URL |
+|---|---|
+| Android Emulator | `http://10.0.2.2:3000` (emulator alias for host `localhost`) |
+| Physical device (same LAN) | `http://192.168.x.x:3000` (your machine's LAN IP) |
+| Production | `https://your-server.com` |
+
+```bash
+# .env.local
+VITE_SERVER_URL=http://10.0.2.2:3000
+```
+
+Also update Google OAuth's **Authorized redirect URIs** to include your Android dev URL:
+`http://10.0.2.2:3000/api/auth/google/callback`
+
 ### Start the dev server + Android hot-reload
 ```bash
-# Terminal 1 — relay server
+# Terminal 1 — relay server (listens on 0.0.0.0 so device can reach it)
 make server
 
-# Terminal 2 — Android dev build (connects to server via LAN IP)
+# Terminal 2 — Android dev build
 make android-dev
 ```
 

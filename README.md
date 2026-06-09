@@ -595,15 +595,18 @@ CI builds a debug APK on every push — see `.github/workflows/android.yml`.
 ### Android Port
 
 - [x] `cdylib` re-enabled — Windows PE limit resolved via `rust-lld`
-- [x] App Links configured — `https://engage.app/auth` + `/invite` in `tauri.conf.json`
-- [x] SQLite path — `app_data_dir()` resolves correctly on Android
-- [x] CI pipeline — `.github/workflows/android.yml` builds debug APK on every push
-- [x] Makefile targets — `android-init`, `android-dev`, `android-build`
-- [x] [`ANDROID.md`](ANDROID.md) — complete setup guide
-- [ ] Developer environment — `rustup target add aarch64-linux-android ...`, SDK + NDK 30, set `ANDROID_HOME` + `NDK_HOME`
-- [ ] Run `make android-init` to generate `src-tauri/gen/android/`
-- [ ] Get SHA-256 fingerprint via Android Studio **Gradle → signingReport** or `keytool` (see [ANDROID.md §5](ANDROID.md#5-get-your-sha-256-certificate-fingerprint))
-- [ ] Register fingerprint: Android OAuth 2.0 Client ID in Google Cloud Console + `assetlinks.json` on `https://engage.app/.well-known/`
+- [x] App Links configured — `https://engage.app/auth` + `/invite` in `tauri.conf.json`; `android:autoVerify="true"` in generated `AndroidManifest.xml`
+- [x] SQLite path — `app_data_dir()` resolves to `/data/data/com.engage.app/files/` on Android
+- [x] CI pipeline — `.github/workflows/android.yml` builds debug APK on every push (NDK 30, 4 ABI targets)
+- [x] Makefile targets — `android-init`, `android-dev`, `android-build`; rustup PATH fix for Windows Scoop users baked in
+- [x] Android Gradle project generated and committed — `src-tauri/gen/android/`; `minSdkVersion=24`, `INTERNET` permission, edge-to-edge, cleartext traffic only in debug
+- [x] All TypeScript + config errors fixed — `scheme: ["https"]`, `onOpenUrl`, `openUrl`, missing npm packages installed
+- [x] Rust cross-compilation verified — `aarch64-linux-android` compiles successfully
+- [x] [`ANDROID.md`](ANDROID.md) — full guide: SDK/NDK setup, fingerprint (3 methods), OAuth client, `assetlinks.json`, `VITE_SERVER_URL` per target, signing, CI, troubleshooting
+- [ ] **Enable Windows Developer Mode** — final step to complete APK packaging (`Settings → System → For developers`)
+- [ ] Set `VITE_SERVER_URL=http://10.0.2.2:3000` in `.env.local` for emulator / LAN IP for device
+- [ ] Register Android OAuth 2.0 Client ID in Google Cloud Console with SHA-1 fingerprint
+- [ ] Deploy `assetlinks.json` to `https://engage.app/.well-known/` with SHA-256 fingerprint
 
 ### iOS Port
 
