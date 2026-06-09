@@ -132,6 +132,17 @@ export function useServerApi() {
 
   // ── Invites ─────────────────────────────────────────────────────────────────
 
+  // ── WebRTC TURN credentials ──────────────────────────────────────────────────
+
+  // @faridguzman: Fetch short-lived TURN credentials from the relay server.
+  // Returns an iceServers array ready for RTCPeerConfiguration.
+  // Always includes the public STUN server; adds TURN when TURN_SECRET is set.
+  async function fetchTurnCredentials(): Promise<{
+    iceServers: { urls: string[]; username?: string; credential?: string }[];
+  }> {
+    return request("GET", "/api/turn-credentials");
+  }
+
   // @faridguzman: Create a 24-hour invite token for the authenticated user.
   // Returns the token and a ready-to-share engage:// deep-link URL.
   async function createInvite(): Promise<{ token: string; expiresAt: number; url: string }> {
@@ -148,6 +159,6 @@ export function useServerApi() {
   return {
     register, fetchPreKeyBundle, uploadPreKeys, sendEnvelope, fetchPendingMessages, fetchOpkCount,
     createGroup, listGroups, getGroup, addGroupMember, removeGroupMember, sendGroupEnvelope,
-    suggestContacts, createInvite, redeemInvite,
+    suggestContacts, createInvite, redeemInvite, fetchTurnCredentials,
   };
 }

@@ -58,7 +58,9 @@ async fn handle_socket(socket: WebSocket, user_id: String, state: AppState) {
             // Handle client → server control frames (ack, read)
             Message::Text(text) => {
                 if let Ok(frame) = serde_json::from_str::<ClientFrame>(&text) {
-                    handle_client_frame(frame, &state).await;
+                    // @faridguzman: Pass user_id so call signaling can stamp
+                    // from_user_id without trusting the client to send it.
+                    handle_client_frame(frame, &user_id, &state).await;
                 }
             }
             _ => {}
@@ -71,34 +73,96 @@ async fn handle_socket(socket: WebSocket, user_id: String, state: AppState) {
 }
 
 /// Route a client-sent frame to the appropriate handler.
-/// Currently handles "ack" and "read" — both look up the original sender
-/// and forward the corresponding envelope to them if they are online.
-async fn handle_client_frame(frame: ClientFrame, state: &AppState) {
-    // Resolve the original sender for this message_id.
-    // Lock is held only for the query, released before any async work.
-    let sender_id: Option<String> = state
-        .db
-        .lock()
-        .ok()
-        .and_then(|db| {
-            db.query_row(
-                "SELECT sender_id FROM messages WHERE id = ?1",
-                rusqlite::params![frame.message_id],
-                |row| row.get::<_, String>(0),
-            )
-            .ok()
-        });
+/// Handles messaging receipts (ack/read) and WebRTC call signaling.
+/// `caller_id` is the authenticated user_id of the sending connection.
+async fn handle_client_frame(frame: ClientFrame, caller_id: &str, state: &AppState) {
+    match frame.kind.as_str() {
+        // ── Messaging receipts ────────────────────────────────────────────────
+        "ack" | "read" => {
+            let Some(message_id) = frame.message_id else { return };
 
-    let Some(sid) = sender_id else { return };
+            // @faridguzman: Look up original sender so we know where to forward
+            // the receipt.  Lock held only for the DB query.
+            let sender_id: Option<String> = state
+                .db
+                .lock()
+                .ok()
+                .and_then(|db| {
+                    db.query_row(
+                        "SELECT sender_id FROM messages WHERE id = ?1",
+                        rusqlite::params![message_id],
+                        |row| row.get::<_, String>(0),
+                    )
+                    .ok()
+                });
 
-    let envelope = match frame.kind.as_str() {
-        "ack"  => WsEnvelope::Ack  { message_id: frame.message_id },
-        "read" => WsEnvelope::Read { message_id: frame.message_id },
-        _ => return,
-    };
+            let Some(sid) = sender_id else { return };
 
+            let envelope = if frame.kind == "ack" {
+                WsEnvelope::Ack  { message_id }
+            } else {
+                WsEnvelope::Read { message_id }
+            };
+
+            push_to_peer(&state.connections, &sid, envelope);
+        }
+
+        // ── WebRTC call signaling ─────────────────────────────────────────────
+        // @faridguzman: The server is a pure relay for all call frames — it
+        // never inspects SDP or ICE candidates.  The `to` field addresses the
+        // remote peer directly; no DB lookup is needed.
+        "call_offer" => {
+            let (Some(to), Some(call_id), Some(sdp)) =
+                (frame.to, frame.call_id, frame.sdp) else { return };
+            // @faridguzman: from_user_id is set by the server from the
+            // authenticated WS connection — the callee cannot be spoofed.
+            push_to_peer(
+                &state.connections,
+                &to,
+                WsEnvelope::CallOffer {
+                    call_id,
+                    from_user_id: caller_id.to_string(),
+                    sdp,
+                    is_video: frame.is_video.unwrap_or(false),
+                },
+            );
+        }
+
+        "call_answer" => {
+            let (Some(to), Some(call_id), Some(sdp)) =
+                (frame.to, frame.call_id, frame.sdp) else { return };
+            push_to_peer(&state.connections, &to, WsEnvelope::CallAnswer { call_id, sdp });
+        }
+
+        "ice_candidate" => {
+            let (Some(to), Some(call_id), Some(candidate)) =
+                (frame.to, frame.call_id, frame.candidate) else { return };
+            push_to_peer(
+                &state.connections,
+                &to,
+                WsEnvelope::IceCandidate {
+                    call_id,
+                    candidate,
+                    sdp_mid: frame.sdp_mid,
+                    sdp_m_line_index: frame.sdp_m_line_index,
+                },
+            );
+        }
+
+        "call_hangup" => {
+            let (Some(to), Some(call_id)) = (frame.to, frame.call_id) else { return };
+            push_to_peer(&state.connections, &to, WsEnvelope::CallHangup { call_id });
+        }
+
+        _ => {}
+    }
+}
+
+/// @faridguzman: Serialise an envelope to JSON and deliver it to a connected peer.
+/// Silently drops the message if the peer is not currently online.
+fn push_to_peer(connections: &crate::state::Connections, peer_id: &str, envelope: WsEnvelope) {
     if let Ok(json) = serde_json::to_string(&envelope) {
-        if let Some(tx) = state.connections.get(&sid) {
+        if let Some(tx) = connections.get(peer_id) {
             let _ = tx.send(Message::Text(json.into()));
         }
     }

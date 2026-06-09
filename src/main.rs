@@ -32,6 +32,9 @@ async fn main() {
         redirect_uri: std::env::var("GOOGLE_REDIRECT_URI")
             .unwrap_or_else(|_| "http://localhost:3000/api/auth/google/callback".into()),
         jwt_secret: std::env::var("JWT_SECRET").expect("JWT_SECRET required"),
+        // @faridguzman: Optional — set to enable TURN credentials endpoint.
+        // Generate with: openssl rand -hex 32
+        turn_secret: std::env::var("TURN_SECRET").ok(),
     };
 
     let app_state = AppState::new(conn, oauth);
@@ -66,6 +69,8 @@ async fn main() {
         .route("/api/groups/{id}/messages", post(routes::groups::send_group_message))
         // @faridguzman: Invite creation — authenticated so only registered users can issue links.
         .route("/api/invites", post(routes::invites::create_invite))
+        // @faridguzman: Short-lived TURN credentials for WebRTC NAT traversal.
+        .route("/api/turn-credentials", get(routes::turn::turn_credentials))
         .route("/ws/{user_id}", get(routes::ws::ws_handler))
         .layer(middleware::from_fn_with_state(
             app_state.clone(),

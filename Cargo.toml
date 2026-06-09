@@ -30,3 +30,7 @@ chrono = { version = "0.4", features = ["serde"] }
 dotenvy = "0.15"
 urlencoding = "2"
 getrandom = "0.4.2"
+
+# @faridguzman: HMAC-SHA1 for TURN short-term credential derivation (coturn lt-cred-mechanism)
+hmac = "0.12"
+sha1 = "0.10"

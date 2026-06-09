@@ -16,6 +16,7 @@ import { useOpkReplenishment } from "./useOpkReplenishment";
 import { useDisappearingMessages } from "./useDisappearingMessages";
 import { useGroupsStore } from "../stores/groups";
 import { useServerApi } from "./useServerApi";
+import { useWebRTC, injectSend } from "./useWebRTC";
 
 // ── Sequence tracking ─────────────────────────────────────────────────────────
 // @faridguzman: lastSeq is the highest sequence number we have successfully
@@ -210,6 +211,9 @@ export function useWebSocket() {
       // @faridguzman: Drain any envelopes that failed to send while offline.
       // Runs async — does not block the WS message loop.
       messagesStore.drainPending().catch(() => {});
+      // @faridguzman: Give the WebRTC composable a reference to send() so it
+      // can dispatch signaling frames without a circular import.
+      injectSend(send);
     };
 
     socket.onmessage = async (event) => {
@@ -234,6 +238,37 @@ export function useWebSocket() {
         const { message_id } = envelope as unknown as { message_id: string };
         messagesStore.updateStatus(message_id, "read");
         invoke("update_message_status", { messageId: message_id, status: "read" }).catch(() => {});
+        return;
+      }
+
+      // ── WebRTC call signaling ─────────────────────────────────────────────
+      if (envelope.type === "call_offer") {
+        const p = envelope as unknown as {
+          call_id: string; from_user_id: string; sdp: string; is_video: boolean;
+        };
+        useWebRTC().handleOffer({
+          callId: p.call_id,
+          fromUserId: p.from_user_id,
+          sdp: p.sdp,
+          isVideo: p.is_video,
+        });
+        return;
+      }
+      if (envelope.type === "call_answer") {
+        const p = envelope as unknown as { call_id: string; sdp: string };
+        await useWebRTC().handleAnswer(p.sdp);
+        return;
+      }
+      if (envelope.type === "ice_candidate") {
+        const p = envelope as unknown as {
+          call_id: string; candidate: string;
+          sdp_mid: string | null; sdp_m_line_index: number | null;
+        };
+        await useWebRTC().handleIceCandidate(p.candidate, p.sdp_mid, p.sdp_m_line_index);
+        return;
+      }
+      if (envelope.type === "call_hangup") {
+        useWebRTC().endCall();
         return;
       }
 

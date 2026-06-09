@@ -609,14 +609,14 @@ CI builds a debug APK on every push — artifacts available in GitHub Actions fo
 
 ### Voice / Video Calls (STUN/TURN NAT Traversal)
 
-- [ ] WS signaling — `CallOffer`, `CallAnswer`, `IceCandidate`, `CallHangup` envelope types
-- [ ] `useWebRTC.ts` — `RTCPeerConnection`, ICE gathering, offer/answer over WS
-- [ ] `CallView.vue` — incoming call dialog, `<video>` elements, mute/hang-up controls
-- [ ] Wire `pi-phone` / `pi-video` buttons in `MessageThread` header (currently rendered, no-op)
-- [ ] STUN — `stun:stun.l.google.com:19302` for development
-- [ ] TURN — deploy `coturn` on VPS (`lt-cred-mechanism`, `realm=engage.app`)
-- [ ] Short-lived TURN credentials — `/api/turn-credentials` HMAC-SHA1 tokens (24h TTL)
-- [ ] Media E2EE — AES-GCM insertable streams on top of DTLS-SRTP
+- [x] WS signaling — `CallOffer`, `CallAnswer`, `IceCandidate`, `CallHangup` in `WsEnvelope`; server routes all call frames as a pure relay (no SDP inspection)
+- [x] `useWebRTC.ts` — full `RTCPeerConnection` composable; trickle ICE; caller/callee state machine (`idle → calling/ringing → active → ended`); mute + camera toggle
+- [x] `CallView.vue` — pulsing incoming call overlay (Accept/Decline), active call view with remote video, local PiP video, call timer, mute/camera/hang-up controls, audio-only mode
+- [x] Call buttons wired — `pi-phone` (voice) and `pi-video` (video) in `MessageThread` header trigger `rtc.startCall()`; disabled when call in progress
+- [x] STUN — `stun:stun.l.google.com:19302` always included in ICE config
+- [x] TURN credential endpoint — `GET /api/turn-credentials` issues HMAC-SHA1 short-term credentials (24h TTL, `lt-cred-mechanism`); gracefully omitted when `TURN_SECRET` not set
+- [ ] Deploy `coturn` on VPS (`lt-cred-mechanism`, `realm=engage.app`, set `TURN_SECRET` env var)
+- [ ] Media E2EE — AES-GCM insertable streams on top of mandatory DTLS-SRTP (post-coturn)
 
 ### Microservices Decomposition
 

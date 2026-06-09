@@ -5,6 +5,7 @@ import { useMessagesStore } from "../stores/messages";
 import { useContactsStore } from "../stores/contacts";
 import { useDisappearingMessages, TIMER_OPTIONS, formatTimer } from "../composables/useDisappearingMessages";
 import { useWebSocket } from "../composables/useWebSocket";
+import { useWebRTC } from "../composables/useWebRTC";
 import Avatar from "primevue/avatar";
 import Button from "primevue/button";
 import InputText from "primevue/inputtext";
@@ -17,7 +18,8 @@ const props = defineProps<{ contactId: string }>();
 const messages = useMessagesStore();
 const contacts = useContactsStore();
 const { scheduleExpiry, startSweep } = useDisappearingMessages();
-const ws = useWebSocket();
+const ws  = useWebSocket();
+const rtc = useWebRTC();
 
 const input = ref("");
 const threadEl = ref<HTMLElement | null>(null);
@@ -141,8 +143,21 @@ watch(msgs, (next, prev) => {
             @update:model-value="onTimerChange"
           />
         </div>
-        <Button icon="pi pi-phone" text rounded size="small" v-tooltip.bottom="'Voice call (coming soon)'" disabled />
-        <Button icon="pi pi-video" text rounded size="small" v-tooltip.bottom="'Video call (coming soon)'" disabled />
+        <!-- @faridguzman: Voice and video call buttons — wired to useWebRTC -->
+        <Button
+          icon="pi pi-phone"
+          text rounded size="small"
+          v-tooltip.bottom="'Voice call'"
+          :disabled="!rtc.status.value === undefined || rtc.status.value !== 'idle'"
+          @click="rtc.startCall(props.contactId, false)"
+        />
+        <Button
+          icon="pi pi-video"
+          text rounded size="small"
+          v-tooltip.bottom="'Video call'"
+          :disabled="rtc.status.value !== 'idle'"
+          @click="rtc.startCall(props.contactId, true)"
+        />
         <Button icon="pi pi-ellipsis-v" text rounded size="small" v-tooltip.bottom="'More options'" />
       </div>
     </div>

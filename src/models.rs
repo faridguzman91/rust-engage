@@ -152,15 +152,65 @@ pub enum WsEnvelope {
     Ack { message_id: String },
     /// Forwarded to the original sender when the recipient opens and reads the message.
     Read { message_id: String },
+
+    // ── WebRTC signaling ──────────────────────────────────────────────────────
+    // @faridguzman: The server never inspects SDP or ICE candidates — it is a
+    // pure relay.  All signaling frames carry a call_id (UUID) so both peers
+    // can correlate offer/answer/candidates to the same RTCPeerConnection.
+
+    /// Caller → callee: SDP offer to start a new call.
+    CallOffer {
+        call_id: String,
+        #[serde(rename = "fromUserId")]
+        from_user_id: String,
+        sdp: String,
+        #[serde(rename = "isVideo")]
+        is_video: bool,
+    },
+    /// Callee → caller: SDP answer, accepting the call.
+    CallAnswer {
+        call_id: String,
+        sdp: String,
+    },
+    /// Either peer → other: trickle ICE candidate.
+    IceCandidate {
+        call_id: String,
+        candidate: String,
+        #[serde(rename = "sdpMid")]
+        sdp_mid: Option<String>,
+        #[serde(rename = "sdpMLineIndex")]
+        sdp_m_line_index: Option<u32>,
+    },
+    /// Either peer → other: call ended or declined.
+    CallHangup {
+        call_id: String,
+    },
+
     Error { code: String, message: String },
 }
 
 /// Frame sent by a connected client over the WebSocket (client → server direction).
+/// The `type` field disambiguates between messaging receipts and call signaling.
 #[derive(Debug, Deserialize)]
 pub struct ClientFrame {
     #[serde(rename = "type")]
     pub kind: String,
-    /// camelCase to match the JS side
+    // ── Messaging receipts (ack / read) ──────────────────────────────────────
     #[serde(rename = "messageId")]
-    pub message_id: String,
+    pub message_id: Option<String>,
+    // ── Call signaling fields ─────────────────────────────────────────────────
+    /// Target peer's user_id — used by all call frame types.
+    pub to: Option<String>,
+    #[serde(rename = "callId")]
+    pub call_id: Option<String>,
+    /// SDP offer or answer body.
+    pub sdp: Option<String>,
+    #[serde(rename = "isVideo")]
+    pub is_video: Option<bool>,
+    /// JSON-serialised RTCIceCandidate.candidate string.
+    pub candidate: Option<String>,
+    #[serde(rename = "sdpMid")]
+    pub sdp_mid: Option<String>,
+    #[serde(rename = "sdpMLineIndex")]
+    pub sdp_m_line_index: Option<u32>,
 }

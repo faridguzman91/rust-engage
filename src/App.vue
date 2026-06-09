@@ -3,6 +3,7 @@ import { onMounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useRouter } from "vue-router";
 import Toast from "primevue/toast";
+import CallView from "./views/CallView.vue";
 import { useAuthStore } from "./stores/auth";
 import { useIdentityStore } from "./stores/identity";
 import { useMessagesStore } from "./stores/messages";
@@ -88,4 +89,6 @@ onMounted(async () => {
 <template>
   <Toast position="bottom-right" />
   <router-view />
+  <!-- @faridguzman: Call overlay — rendered above all routes via Teleport -->
+  <CallView />
 </template>

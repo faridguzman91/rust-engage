@@ -13,6 +13,10 @@ pub struct OAuthConfig {
     pub client_secret: String,
     pub redirect_uri: String,
     pub jwt_secret: String,
+    /// @faridguzman: Shared secret for HMAC-SHA1 short-term TURN credentials.
+    /// Set via TURN_SECRET env var. If absent, /api/turn-credentials returns
+    /// only the public STUN server so development still works without coturn.
+    pub turn_secret: Option<String>,
 }
 
 #[derive(Clone)]
