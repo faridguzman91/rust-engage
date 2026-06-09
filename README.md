@@ -517,13 +517,16 @@ For production: use HTTPS, remove `FRONTEND_URL` (uses `engage://` deep-link), r
 
 ### Android Port
 
-- [ ] Add Rust targets: `aarch64-linux-android`, `armv7-linux-androideabi`
-- [ ] Install Android SDK/NDK; set `ANDROID_HOME`, `NDK_HOME`
-- [ ] Run `pnpm tauri android init` to generate `src-tauri/gen/android/`
-- [ ] Fix `cdylib` crate type: add conditional feature flag (currently excluded for Windows PE limit)
-- [ ] OAuth redirect: replace `engage://` with Android App Link (`https://engage.app/auth`)
-- [ ] SQLite path: use `app_data_dir()` from `tauri::api::path`
-- [ ] CI: GitHub Actions `ubuntu-latest` + `java-setup-sdk` + `cargo ndk`
+- [x] Fix `cdylib` crate type — re-enabled alongside `staticlib`/`rlib`; Windows PE limit already resolved via `rust-lld` in `.cargo/config.toml`
+- [x] OAuth redirect — Android App Links (`https://engage.app/auth`, `https://engage.app/invite`) configured in `tauri.conf.json` `plugins.deep-link.mobile`
+- [x] SQLite path — `app_data_dir()` already used in `lib.rs`; resolves to `/data/data/com.engage.app/files/` on Android
+- [x] CI — `.github/workflows/android.yml`: Temurin JDK 17, Android SDK + NDK 27, Rust stable + 4 Android targets, `cargo-ndk`, debug APK artifact
+- [x] Makefile targets — `android-init`, `android-dev`, `android-build`
+- [x] `ANDROID.md` — complete setup guide (SDK, NDK, targets, keystore signing, `assetlinks.json`, troubleshooting)
+- [ ] Add Rust targets on dev machine: `rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android`
+- [ ] Install Android Studio SDK + NDK 27; set `ANDROID_HOME`, `NDK_HOME`
+- [ ] Run `make android-init` once to generate `src-tauri/gen/android/`
+- [ ] Add `assetlinks.json` to `https://engage.app/.well-known/` for App Link verification
 
 ### iOS Port
 

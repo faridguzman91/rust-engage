@@ -1,0 +1,131 @@
+# @faridguzman: Android CI — builds a debug APK on every push to master
+# and on every pull request.  The artifact is uploaded so it can be
+# downloaded directly from the Actions run without a Play Store deployment.
+#
+# Prerequisites checked by this workflow:
+#   - Java 17 (Gradle requirement)
+#   - Android SDK + NDK 27
+#   - Rust stable + four Android Tier-2 targets
+#   - cargo-ndk (Tauri's Android build pipeline uses it internally)
+#   - Node 22 LTS + pnpm 9
+#
+# To build a signed release APK locally, see ANDROID.md.
+
+name: Android
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  NDK_VERSION: "27.0.11902837"
+  JAVA_VERSION: "17"
+  NODE_VERSION: "22"
+  PNPM_VERSION: "9.15.9"
+
+jobs:
+  build:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Java (Gradle requires 17+) ───────────────────────────────────────────
+      - name: Set up Java ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: temurin
+
+      # ── Android SDK + NDK ────────────────────────────────────────────────────
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK ${{ env.NDK_VERSION }}
+        run: |
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "ndk;${{ env.NDK_VERSION }}" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      - name: Export NDK_HOME
+        run: echo "NDK_HOME=$ANDROID_HOME/ndk/${{ env.NDK_VERSION }}" >> $GITHUB_ENV
+
+      # ── Rust + Android targets ───────────────────────────────────────────────
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # @faridguzman: Four ABI targets — arm64, arm32, x86_64, x86.
+          # arm64 (aarch64) covers all modern Android devices (API 21+).
+          # arm32 (armv7) covers older devices still in the field.
+          # x86_64 + x86 cover emulators used in CI and local testing.
+          targets: >-
+            aarch64-linux-android,
+            armv7-linux-androideabi,
+            x86_64-linux-android,
+            i686-linux-android
+
+      - name: Cache Rust build artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-android-rust-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-android-rust-
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      # ── Node + pnpm ──────────────────────────────────────────────────────────
+      - name: Set up Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Enable pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@${{ env.PNPM_VERSION }} --activate
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── Tauri Android init (only when gen/android is absent) ─────────────────
+      # @faridguzman: gen/android/ is generated once and committed.  On fresh
+      # checkouts (or if the directory was .gitignored) we regenerate it here.
+      - name: Initialise Tauri Android project
+        run: |
+          if [ ! -d "src-tauri/gen/android" ]; then
+            pnpm tauri android init
+          fi
+
+      # ── Build ────────────────────────────────────────────────────────────────
+      - name: Build debug APK
+        run: pnpm tauri android build --apk --debug
+        env:
+          # @faridguzman: Tauri's Android pipeline picks up NDK_HOME to locate
+          # the clang cross-compilers and linkers for each ABI.
+          NDK_HOME: ${{ env.NDK_HOME }}
+
+      # ── Upload artifact ──────────────────────────────────────────────────────
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: engage-android-debug-${{ github.sha }}
+          path: src-tauri/gen/android/app/build/outputs/apk/
+          if-no-files-found: error
+          retention-days: 14

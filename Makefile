@@ -1,15 +1,18 @@
-# @faridguzman91: Makefile for the engage project.
+# @faridguzman: Makefile for the engage project.
 # Runs the relay server and Tauri desktop client simultaneously.
 #
 # Usage:
-#   make dev        — start server + client in parallel (recommended)
-#   make server     — start relay server only
-#   make client     — start Tauri client only
-#   make install    — install frontend dependencies
-#   make build      — production build (client binary + bundled server)
-#   make docker-up  — start server via Docker Compose
-#   make docker-down — stop Docker Compose services
-#   make clean      — remove build artefacts
+#   make dev            — start server + client in parallel (recommended)
+#   make server         — start relay server only
+#   make client         — start Tauri client only
+#   make install        — install frontend dependencies
+#   make build          — production build (client binary + bundled server)
+#   make android-init   — generate src-tauri/gen/android/ (run once after SDK setup)
+#   make android-dev    — live-reload dev build on connected Android device/emulator
+#   make android-build  — release APK in src-tauri/gen/android/app/build/outputs/apk/
+#   make docker-up      — start server via Docker Compose
+#   make docker-down    — stop Docker Compose services
+#   make clean          — remove build artefacts
 
 SHELL       := /bin/bash
 SERVER_DIR  := ../engage-server
@@ -26,7 +29,7 @@ ifneq ($(NVM_NODE22),)
   export PATH := $(NVM_NODE22)/bin:$(PATH)
 endif
 
-.PHONY: dev server client install build docker-up docker-down clean help
+.PHONY: dev server client install build android-init android-dev android-build docker-up docker-down clean help
 
 ## Start relay server + Tauri client in parallel
 dev: install
@@ -52,6 +55,18 @@ install:
 ## Production build — Tauri binary in src-tauri/target/release/bundle/
 build: install
 	$(PNPM) tauri build
+
+## Generate the Android Gradle project (run once; requires Android SDK + NDK)
+android-init:
+	$(PNPM) tauri android init
+
+## Start dev build on connected Android device or running emulator
+android-dev:
+	$(PNPM) tauri android dev
+
+## Build a release APK — output: src-tauri/gen/android/app/build/outputs/apk/
+android-build: install
+	$(PNPM) tauri android build --apk
 
 ## Start server via Docker Compose
 docker-up:

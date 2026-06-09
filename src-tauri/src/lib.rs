@@ -1,6 +1,20 @@
-// @faridguzman: Tauri application entry point.
-// Registers all IPC commands, initialises the SQLite database, and sets up
-// the deep-link handler (engage:// scheme) for production OAuth callbacks.
+// @faridguzman: Tauri application entry point — desktop, Android, and iOS.
+//
+// Platform notes:
+//   Desktop (Windows/macOS/Linux)
+//     — engage:// custom scheme registered at runtime (except macOS, where it
+//       is declared statically in Info.plist via tauri.conf.json).
+//   Android
+//     — App Links (https://engage.app/auth, https://engage.app/invite) handle
+//       OAuth callbacks and invite deep links.  The custom scheme is NOT used
+//       on Android because App Links verify domain ownership, are harder to
+//       hijack, and work without any runtime registration.
+//     — The CDYlib is loaded by the Android runtime as libengagelib.so via JNI.
+//     — SQLite database lives in app_data_dir() which maps to
+//       /data/data/com.engage.app/files/ on Android.
+//   iOS
+//     — engage:// custom scheme declared in Info.plist (same as macOS).
+//     — Database lives in app_data_dir() which maps to the app's Documents dir.
 mod commands;
 mod crypto;
 mod storage;
@@ -28,9 +42,11 @@ pub fn run() {
             let conn = storage::db::open(&db_path).expect("failed to open database");
             app.manage(AppState { db: Mutex::new(conn) });
 
-            // Register the engage:// URI scheme at runtime on Windows/Linux.
-            // On macOS the scheme is declared in Info.plist via tauri.conf.json and
-            // does not support runtime registration (returns "unsupported platform").
+            // @faridguzman: Register the engage:// URI scheme at runtime on Windows/Linux.
+            // macOS: declared statically in Info.plist — runtime registration is a no-op.
+            // Android: uses App Links (https scheme) configured in tauri.conf.json —
+            //   runtime registration of custom schemes is not supported on Android.
+            // iOS: declared in Info.plist — same as macOS.
             #[cfg(all(desktop, not(target_os = "macos")))]
             app.deep_link().register("engage")?;
 

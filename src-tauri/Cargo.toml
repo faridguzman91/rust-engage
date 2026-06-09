@@ -7,10 +7,11 @@ edition = "2021"
 
 [lib]
 name = "engage_lib"
-# cdylib is only needed for mobile (Android JNI / iOS dylib).
-# On Windows desktop it causes the PE ordinal limit to be exceeded (>65535 exports).
-# Re-add "cdylib" when targeting Android/iOS.
-crate-type = ["staticlib", "rlib"]
+# @faridguzman: cdylib is required for Android JNI (libengagelib.so) and iOS dylib.
+# The Windows PE ordinal-limit issue is resolved by rust-lld (see .cargo/config.toml
+# which passes -fuse-ld=lld for x86_64-pc-windows-gnu).  All three crate types
+# must be present so the same Cargo.toml works for desktop, Android, and iOS.
+crate-type = ["staticlib", "rlib", "cdylib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
