@@ -5,7 +5,7 @@ import { useRouter } from "vue-router";
 import { useIdentityStore } from "../stores/identity";
 import { useAuthStore } from "../stores/auth";
 import { useServerApi } from "../composables/useServerApi";
-import { open as shellOpen } from "@tauri-apps/plugin-opener";
+import { openUrl as shellOpen } from "@tauri-apps/plugin-opener";
 import QRCode from "qrcode";
 import Panel from "primevue/panel";
 import Button from "primevue/button";

@@ -12,8 +12,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { useAuthStore } from "../stores/auth";
 import { useServerApi } from "./useServerApi";
 
-const LOW_WATERMARK = 10;
-const BATCH_SIZE = 100; // @faridguzman91: 100 OPKs per upload keeps the pool well-stocked
+// @faridguzman: Threshold and batch size are enforced on the Rust side via
+// get_opk_status / generate_and_store_opks — no TS constants needed here.
 
 // @faridguzman91: Module-level debounce flag prevents concurrent replenishment runs
 let replenishing = false;

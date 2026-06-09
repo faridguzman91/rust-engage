@@ -43,8 +43,7 @@ async function send() {
   input.value = "";
   sending.value = true;
   try {
-    // @faridguzman91: Sender Key encryption — one encrypt for all members
-    const userId = identity.profile?.userId ?? "";
+    // @faridguzman: Sender Key encryption — one encrypt for all members
     const ciphertext = await groups.encryptMessage(props.groupId, body);
     await api.sendGroupEnvelope(props.groupId, {
       senderIk: identity.keys?.identityPublicKey ?? "",

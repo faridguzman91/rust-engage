@@ -7,7 +7,7 @@ import { useAuthStore } from "./stores/auth";
 import { useIdentityStore } from "./stores/identity";
 import { useMessagesStore } from "./stores/messages";
 import { useServerApi } from "./composables/useServerApi";
-import { onOpenedWith } from "@tauri-apps/plugin-deep-link";
+import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -36,7 +36,7 @@ onMounted(async () => {
 
   // @faridguzman: Register the deep link listener so invite and auth links
   // work while the app is already running (not just on cold launch).
-  onOpenedWith((urls) => {
+  onOpenUrl((urls: string[]) => {
     for (const url of urls) handleDeepLink(url);
   }).catch(() => {}); // silently ignore if plugin not available (browser dev mode)
 

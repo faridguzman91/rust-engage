@@ -11,7 +11,6 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useServerApi } from "../composables/useServerApi";
-import { useIdentityStore } from "./identity";
 import { useAuthStore } from "./auth";
 import { useContactsStore } from "./contacts";
 
