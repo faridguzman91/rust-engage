@@ -500,27 +500,85 @@ Use HTTPS, remove `FRONTEND_URL` (falls back to `engage://` deep link), run serv
 
 ## Android build
 
-The Android Gradle project (`src-tauri/gen/android/`) is already generated and committed. See [ANDROID.md](ANDROID.md) for the full guide. Quick version:
+The Android Gradle project (`src-tauri/gen/android/`) is already generated and committed. See [ANDROID.md](ANDROID.md) for the complete guide.
+
+### 1. Prerequisites
 
 ```bash
-# 1. Install Android Studio + NDK 30, set ANDROID_HOME + NDK_HOME
-# 2. Install Rust Android targets
+# Rust Android targets
 rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
 cargo install cargo-ndk --locked
 
-# 3. Set server URL in .env.local (localhost won't reach from device)
-echo "VITE_SERVER_URL=http://10.0.2.2:3000" >> .env.local   # emulator
-# echo "VITE_SERVER_URL=http://192.168.x.x:3000" >> .env.local  # physical device
+# Windows: enable Developer Mode (Settings → System → For developers)
+# Required for symlink creation during APK packaging
+```
 
-# 4. Enable Windows Developer Mode (Settings → System → For developers)
-#    Required for symlink creation during APK packaging
+Install **Android Studio** from https://developer.android.com/studio, then open **SDK Manager** and install:
 
-# 5. Build APK
+| Component | Version |
+|---|---|
+| Android SDK Platform | API 35 |
+| Android SDK Build-Tools | 35.0.0 |
+| Android NDK (Side by side) | 30.x |
+| Android SDK Command-line Tools | latest |
+
+Set environment variables:
+
+```powershell
+# Windows — add to your PowerShell profile or system environment variables
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+$env:NDK_HOME     = "$env:ANDROID_HOME\ndk\30.0.14904198"
+```
+
+```bash
+# macOS / Linux — add to ~/.zshrc or ~/.bashrc
+export ANDROID_HOME="$HOME/Library/Android/sdk"   # macOS
+export NDK_HOME="$ANDROID_HOME/ndk/30.0.14904198"
+```
+
+### 2. Create an Android Virtual Device (AVD / Emulator)
+
+> Skip this step if you are using a physical Android device via USB.
+
+1. Open **Android Studio** → **Device Manager** (toolbar or `View → Tool Windows → Device Manager`)
+2. Click **+** → **Create Virtual Device**
+3. Choose a hardware profile — **Pixel 7** is recommended (matches a modern real device)
+4. Click **Next** → Select a system image:
+   - **API 35** (Android 15), **ABI: arm64-v8a** (matches physical hardware)
+   - Or **x86_64** for faster emulation on Intel/AMD hosts
+5. Click **Next** → **Finish**
+6. Start the emulator by clicking the **▶ Play** button next to the new AVD
+
+Verify the emulator is visible to ADB:
+
+```bash
+adb devices
+# Should show:  emulator-5554   device
+```
+
+### 3. Configure the server URL
+
+`localhost` is unreachable from the emulator — use the special alias `10.0.2.2` which maps to the host machine:
+
+```bash
+# .env.local
+VITE_SERVER_URL=http://10.0.2.2:3000          # emulator
+# VITE_SERVER_URL=http://192.168.x.x:3000     # physical device on same LAN
+```
+
+### 4. Run
+
+```bash
+# Start the relay server (Terminal 1)
+make server
+
+# Build and deploy to the running emulator or connected device (Terminal 2)
+make android-dev
+# Tauri will prompt to select a target if more than one is connected
+
+# Or build a standalone APK
 make android-build
 # APK → src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release-unsigned.apk
-
-# 6. Dev build with hot-reload on connected device / emulator
-make android-dev
 ```
 
 CI builds a debug APK on every push — artifacts available in GitHub Actions for 14 days.
