@@ -4,11 +4,13 @@
 
 ---
 
-[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
-![Rust](https://img.shields.io/badge/Rust-1.76+-f74c00?logo=rust&logoColor=white)
-![Vue](https://img.shields.io/badge/Vue-3-42b883?logo=vue.js&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white)
-![Android](https://img.shields.io/badge/Android-Tauri%202-3ddc84?logo=android&logoColor=white)
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg" alt="License: AGPL v3" /></a>
+  <img src="https://img.shields.io/badge/Rust-1.76+-f74c00?logo=rust&logoColor=white" alt="Rust" />
+  <img src="https://img.shields.io/badge/Vue-3-42b883?logo=vue.js&logoColor=white" alt="Vue 3" />
+  <img src="https://img.shields.io/badge/TypeScript-5-3178c6?logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Android-Tauri%202-3ddc84?logo=android&logoColor=white" alt="Android" />
+</p>
 
 End-to-end encrypted chat — desktop (Windows / macOS / Linux) and Android. Built with Tauri 2, Vue 3, and Rust.
 
