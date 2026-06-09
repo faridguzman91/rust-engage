@@ -316,9 +316,26 @@ This path is private to the app, backed up by Android Auto Backup by default, an
 | `ANDROID_HOME is not set` | Export the variable in your shell profile and restart the terminal |
 | `NDK_HOME is not set` | Point to the exact NDK version directory (not just `$ANDROID_HOME/ndk/`) |
 | `error: linker 'aarch64-linux-android-clang' not found` | Ensure NDK_HOME is correct; `cargo-ndk` constructs the linker path from it |
+| `Failed to create a symbolic link … libengage_lib.so` | Enable **Windows Developer Mode** (see below) |
 | `Could not determine the dependencies of task ':app:compileDebugJavaWithJavac'` | Run `pnpm tauri android init` again after a `tauri.conf.json` change |
 | App crashes on launch | Run `adb logcat -s RustStdoutStderr:V` to see Rust `eprintln!` / `tracing` output |
 | OAuth redirect does not open the app | Confirm `assetlinks.json` is served over HTTPS with correct fingerprint |
+
+---
+
+### Windows Developer Mode (required for symlink creation)
+
+Tauri's Android build links `.so` files into the Gradle JNI libs directory using symlinks. Windows blocks symlink creation for non-admin processes unless **Developer Mode** is enabled.
+
+**Enable it once — no reboot required:**
+
+1. Open **Settings** → **System** → **For developers**
+   *(or search "Developer settings" in the Start menu)*
+2. Toggle **Developer Mode** → **On**
+3. Confirm the warning dialog
+4. Re-run `make android-build` — no changes to any project files needed
+
+Alternatively, run the build in an **Administrator** PowerShell terminal (not recommended as a permanent fix).
 | Google Sign-In fails on device | Add an **Android** OAuth 2.0 Client ID in Google Cloud Console with the device's SHA-1 fingerprint |
 | `debug.keystore` not found | Run `make android-dev` once — Gradle auto-generates it in `%USERPROFILE%\.android\` |
 | signingReport shows wrong SHA | Make sure you ran signingReport on the correct build variant (debug vs release) |
