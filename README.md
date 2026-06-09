@@ -600,9 +600,10 @@ CI builds a debug APK on every push — see `.github/workflows/android.yml`.
 - [x] CI pipeline — `.github/workflows/android.yml` builds debug APK on every push
 - [x] Makefile targets — `android-init`, `android-dev`, `android-build`
 - [x] [`ANDROID.md`](ANDROID.md) — complete setup guide
-- [ ] Developer environment — `rustup target add aarch64-linux-android ...`, SDK + NDK 27
+- [ ] Developer environment — `rustup target add aarch64-linux-android ...`, SDK + NDK 27, set `ANDROID_HOME` + `NDK_HOME`
 - [ ] Run `make android-init` to generate `src-tauri/gen/android/`
-- [ ] Add `assetlinks.json` to `https://engage.app/.well-known/` for App Link verification
+- [ ] Get SHA-256 fingerprint via Android Studio **Gradle → signingReport** or `keytool` (see [ANDROID.md §5](ANDROID.md#5-get-your-sha-256-certificate-fingerprint))
+- [ ] Register fingerprint: Android OAuth 2.0 Client ID in Google Cloud Console + `assetlinks.json` on `https://engage.app/.well-known/`
 
 ### iOS Port
 
