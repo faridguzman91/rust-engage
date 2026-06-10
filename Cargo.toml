@@ -34,3 +34,4 @@ getrandom = "0.4.2"
 # @faridguzman: HMAC-SHA1 for TURN short-term credential derivation (coturn lt-cred-mechanism)
 hmac = "0.12"
 sha1 = "0.10"
+url = "2.5.8"

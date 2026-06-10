@@ -44,12 +44,18 @@ export const useAuthStore = defineStore("auth", () => {
     localStorage.removeItem(TOKEN_KEY);
   }
 
-  // @faridguzman91: Navigate the Tauri webview through Google OAuth.
+  // @faridguzman: Navigate the Tauri webview through Google OAuth.
   // Must NOT use openUrl() here — that opens the system browser which has no
   // __TAURI_INTERNALS__, making invoke() calls fail on any subsequent screen.
   function loginWithGoogle() {
     window.location.href = `${SERVER_BASE}/api/auth/google`;
   }
 
-  return { token, isAuthenticated, profile, setToken, clearToken, loginWithGoogle };
+  // @faridguzman: Navigate through Nextcloud OAuth — same pattern as Google.
+  // The server redirects back to /#/auth?token=JWT using the same callback flow.
+  function loginWithNextcloud() {
+    window.location.href = `${SERVER_BASE}/api/auth/nextcloud`;
+  }
+
+  return { token, isAuthenticated, profile, setToken, clearToken, loginWithGoogle, loginWithNextcloud };
 });

@@ -20,6 +20,24 @@ pub struct OAuthConfig {
     /// Set via TURN_SECRET env var. If absent, /api/turn-credentials returns
     /// only the public STUN server so development still works without coturn.
     pub turn_secret: Option<String>,
+    /// @faridguzman: Optional Nextcloud OAuth provider.
+    /// Set NEXTCLOUD_URL + NEXTCLOUD_CLIENT_ID + NEXTCLOUD_CLIENT_SECRET to enable.
+    /// The admin of the Nextcloud instance must create an OAuth 2.0 app under
+    /// Settings → Security → OAuth 2.0 and supply the client credentials here.
+    pub nextcloud: Option<NextcloudConfig>,
+}
+
+/// @faridguzman: Configuration for a single Nextcloud instance acting as an
+/// OAuth identity provider.  One engage deployment talks to one Nextcloud.
+#[derive(Clone)]
+pub struct NextcloudConfig {
+    /// Base URL of the Nextcloud instance, e.g. https://cloud.example.com
+    pub server_url: String,
+    /// Human-readable name shown on the login button, e.g. "My Cloud"
+    pub server_name: String,
+    pub client_id: String,
+    pub client_secret: String,
+    pub redirect_uri: String,
 }
 
 #[derive(Clone)]

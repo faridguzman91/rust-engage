@@ -65,10 +65,19 @@ fn migrate(conn: &Connection) -> Result<()> {
             email       TEXT NOT NULL
         );
 
-        -- Short-lived CSRF state tokens for the OAuth flow
+        -- Short-lived CSRF state tokens for the OAuth flow (shared by Google + Nextcloud)
         CREATE TABLE IF NOT EXISTS oauth_states (
             state       TEXT PRIMARY KEY,
             created_at  INTEGER NOT NULL
+        );
+
+        -- @faridguzman: Nextcloud OAuth accounts — maps nc_user_id to engage user_id.
+        -- nc_user_id is host:username so accounts on different Nextcloud instances
+        -- do not collide even when they share the same username.
+        CREATE TABLE IF NOT EXISTS nextcloud_accounts (
+            nc_user_id  TEXT PRIMARY KEY,
+            user_id     TEXT NOT NULL REFERENCES devices(user_id),
+            email       TEXT NOT NULL DEFAULT ''
         );
 
         -- @faridguzman: Group chat tables

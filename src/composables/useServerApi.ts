@@ -135,6 +135,17 @@ export function useServerApi() {
 
   // ── Invites ─────────────────────────────────────────────────────────────────
 
+  // ── Auth providers ───────────────────────────────────────────────────────────
+
+  // @faridguzman: Called by LoginView on mount to discover which auth providers
+  // the server has configured.  Public endpoint — no JWT required.
+  async function fetchAuthProviders(): Promise<{
+    google: boolean;
+    nextcloud: { enabled: boolean; serverName: string; serverUrl: string };
+  }> {
+    return request("GET", "/api/auth/providers");
+  }
+
   // ── WebRTC TURN credentials ──────────────────────────────────────────────────
 
   // @faridguzman: Fetch short-lived TURN credentials from the relay server.
@@ -162,6 +173,6 @@ export function useServerApi() {
   return {
     register, fetchPreKeyBundle, uploadPreKeys, sendEnvelope, fetchPendingMessages, fetchOpkCount,
     createGroup, listGroups, getGroup, addGroupMember, removeGroupMember, sendGroupEnvelope,
-    suggestContacts, createInvite, redeemInvite, fetchTurnCredentials,
+    suggestContacts, createInvite, redeemInvite, fetchTurnCredentials, fetchAuthProviders,
   };
 }

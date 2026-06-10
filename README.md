@@ -704,6 +704,15 @@ See the full licence text in [LICENSE](LICENSE).
 
 ---
 
+### Nextcloud Integration
+
+- [x] **Nextcloud OAuth** — `GET /api/auth/nextcloud` + `/callback`; mirrors Google flow exactly; user IDs prefixed `nc_` to avoid collisions; `nextcloud_accounts` table maps `host:username → user_id`
+- [x] **Provider discovery** — `GET /api/auth/providers` (public); client fetches on login screen mount; Nextcloud button only appears when `NEXTCLOUD_URL` + credentials are set
+- [x] **Login UI** — Nextcloud button with cloud logo + server URL hint; Divider between providers; brand-tinted hover state; hint text updated to be provider-neutral
+- [x] **Zero Google dependency** — a fully self-hosted engage deployment can authenticate entirely via Nextcloud with no Google account required
+- [ ] **Nextcloud WebDAV file attachments** — use Nextcloud storage for the attach button (currently disabled in `MessageThread`)
+- [ ] **Nextcloud contacts import** — discover which Nextcloud contacts are on engage (mirrors Gmail import feature)
+
 ### Microservices Decomposition
 
 - [ ] `auth-svc` — Google OAuth, JWT issue/verify, token refresh

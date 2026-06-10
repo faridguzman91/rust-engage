@@ -38,6 +38,37 @@ async fn main() {
         // @faridguzman: Optional — set to enable TURN credentials endpoint.
         // Generate with: openssl rand -hex 32
         turn_secret: std::env::var("TURN_SECRET").ok(),
+        nextcloud: {
+            // @faridguzman: All three vars must be set to enable Nextcloud auth.
+            // NEXTCLOUD_SERVER_NAME is optional — defaults to the host part of the URL.
+            match (
+                std::env::var("NEXTCLOUD_URL"),
+                std::env::var("NEXTCLOUD_CLIENT_ID"),
+                std::env::var("NEXTCLOUD_CLIENT_SECRET"),
+            ) {
+                (Ok(url), Ok(cid), Ok(csec)) => {
+                    let name = std::env::var("NEXTCLOUD_SERVER_NAME")
+                        .unwrap_or_else(|_| {
+                            url::Url::parse(&url)
+                                .ok()
+                                .and_then(|u| u.host_str().map(String::from))
+                                .unwrap_or_else(|| "Nextcloud".into())
+                        });
+                    let redirect = std::env::var("NEXTCLOUD_REDIRECT_URI")
+                        .unwrap_or_else(|_| {
+                            format!("http://localhost:3000/api/auth/nextcloud/callback")
+                        });
+                    Some(state::NextcloudConfig {
+                        server_url: url,
+                        server_name: name,
+                        client_id: cid,
+                        client_secret: csec,
+                        redirect_uri: redirect,
+                    })
+                }
+                _ => None,
+            }
+        },
     };
 
     let app_state = AppState::new(conn, oauth);
@@ -51,6 +82,12 @@ async fn main() {
     let public = Router::new()
         .route("/api/auth/google", get(routes::oauth::start))
         .route("/api/auth/google/callback", get(routes::oauth::callback))
+        // @faridguzman: Nextcloud OAuth — routes are public (no JWT yet at login time)
+        .route("/api/auth/nextcloud", get(routes::nextcloud::start))
+        .route("/api/auth/nextcloud/callback", get(routes::nextcloud::callback))
+        // @faridguzman: Providers discovery — tells the client which auth methods are enabled.
+        // Called from LoginView before the user has a JWT.
+        .route("/api/auth/providers", get(routes::nextcloud::providers))
         // @faridguzman: Invite redemption is public so the recipient does not need
         // an account yet when they tap the link.
         .route("/api/invites/{token}", get(routes::invites::redeem_invite));
