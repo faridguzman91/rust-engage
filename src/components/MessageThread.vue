@@ -28,7 +28,23 @@ const threadEl = ref<HTMLElement | null>(null);
 const sending = ref(false);
 const loading = ref(false);
 const timerSecs = ref(0);
+const sendError = ref("");          // @faridguzman: inline send-error notice
+let sendErrorTimer: ReturnType<typeof setTimeout> | null = null;
 let sweepInterval: ReturnType<typeof setInterval> | null = null;
+
+function showSendError(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  // @faridguzman: Translate common server errors into plain English
+  if (msg.includes("404"))        sendError.value = "Contact not found on the server — they may not have registered yet.";
+  else if (msg.includes("401"))   sendError.value = "Session expired — please sign in again.";
+  else if (msg.includes("session expired")) sendError.value = "Session expired — please sign in again.";
+  else if (msg.includes("fetch") || msg.includes("network") || msg.includes("Failed to fetch"))
+                                   sendError.value = "Cannot reach the server — check your connection.";
+  else                             sendError.value = `Message not sent: ${msg}`;
+
+  if (sendErrorTimer) clearTimeout(sendErrorTimer);
+  sendErrorTimer = setTimeout(() => { sendError.value = ""; }, 6000);
+}
 
 const contact = computed(() => contacts.getById(props.contactId));
 const msgs = computed(() => messages.forConversation(props.contactId));
@@ -64,10 +80,15 @@ async function send() {
   const body = input.value.trim();
   input.value = "";
   sending.value = true;
+  sendError.value = "";
   try {
     const msg = await messages.send(props.contactId, body);
     scheduleExpiry(msg);
     scrollToBottom();
+  } catch (err) {
+    // @faridguzman: Restore the draft so the user doesn't lose what they typed
+    input.value = body;
+    showSendError(err);
   } finally {
     sending.value = false;
   }
@@ -231,6 +252,15 @@ watch(msgs, (next, prev) => {
         </div>
       </template>
     </div>
+
+    <!-- @faridguzman: Inline send-error notice — auto-dismisses after 6s -->
+    <Transition name="err-slide">
+      <div v-if="sendError" class="send-error-bar">
+        <i class="pi pi-exclamation-triangle" style="flex-shrink:0;" />
+        <span>{{ sendError }}</span>
+        <button class="err-dismiss" @click="sendError = ''">&times;</button>
+      </div>
+    </Transition>
 
     <!-- Composer -->
     <div class="composer">
@@ -400,6 +430,30 @@ watch(msgs, (next, prev) => {
   color: var(--engage-accent);
   opacity: 1;
 }
+
+/* @faridguzman: Send-error notice bar */
+.send-error-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(220, 53, 69, 0.12);
+  border-top: 1px solid rgba(220, 53, 69, 0.35);
+  color: #f87171;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+.send-error-bar span { flex: 1; line-height: 1.4; }
+.err-dismiss {
+  background: none; border: none; cursor: pointer;
+  color: #f87171; font-size: 1rem; padding: 0 0.2rem; opacity: 0.7;
+  line-height: 1;
+}
+.err-dismiss:hover { opacity: 1; }
+
+/* slide up/down transition */
+.err-slide-enter-active, .err-slide-leave-active { transition: all 0.2s ease; }
+.err-slide-enter-from, .err-slide-leave-to { transform: translateY(4px); opacity: 0; }
 
 .composer {
   display: flex;

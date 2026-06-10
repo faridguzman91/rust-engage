@@ -27,6 +27,19 @@ const input = ref("");
 const threadEl = ref<HTMLElement | null>(null);
 const sending = ref(false);
 const loading = ref(false);
+const sendError = ref("");
+let sendErrorTimer: ReturnType<typeof setTimeout> | null = null;
+
+function showSendError(err: unknown) {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg.includes("404"))        sendError.value = "Group or member not found on the server.";
+  else if (msg.includes("401"))   sendError.value = "Session expired — please sign in again.";
+  else if (msg.includes("fetch") || msg.includes("Failed to fetch"))
+                                   sendError.value = "Cannot reach the server — check your connection.";
+  else                             sendError.value = `Message not sent: ${msg}`;
+  if (sendErrorTimer) clearTimeout(sendErrorTimer);
+  sendErrorTimer = setTimeout(() => { sendError.value = ""; }, 6000);
+}
 
 const group = computed(() => groups.getById(props.groupId));
 const msgs = computed(() => messages.forConversation(props.groupId));
@@ -44,6 +57,7 @@ async function send() {
   const body = input.value.trim();
   input.value = "";
   sending.value = true;
+  sendError.value = "";
   try {
     // @faridguzman: Sender Key encryption — one encrypt for all members
     const ciphertext = await groups.encryptMessage(props.groupId, body);
@@ -58,6 +72,9 @@ async function send() {
     });
     messages.append({ ...msg, conversationId: props.groupId });
     scrollToBottom();
+  } catch (err) {
+    input.value = body; // restore draft
+    showSendError(err);
   } finally {
     sending.value = false;
   }
@@ -147,6 +164,15 @@ watch(() => props.groupId, load);
       </template>
     </div>
 
+    <!-- @faridguzman: Inline send-error notice -->
+    <Transition name="err-slide">
+      <div v-if="sendError" class="send-error-bar">
+        <i class="pi pi-exclamation-triangle" style="flex-shrink:0;" />
+        <span>{{ sendError }}</span>
+        <button class="err-dismiss" @click="sendError = ''">&times;</button>
+      </div>
+    </Transition>
+
     <!-- Composer -->
     <div class="composer">
       <InputText
@@ -211,6 +237,21 @@ watch(() => props.groupId, load);
 .sender-name { font-size:0.72rem; font-weight:600; color:var(--engage-accent); margin-bottom:0.1rem; }
 .bubble-body { font-size:0.92rem; line-height:1.45; }
 .bubble-meta { font-size:0.68rem; opacity:0.65; align-self:flex-end; }
+
+.send-error-bar {
+  display:flex; align-items:center; gap:0.5rem;
+  padding:0.5rem 1rem;
+  background:rgba(220,53,69,0.12); border-top:1px solid rgba(220,53,69,0.35);
+  color:#f87171; font-size:0.8rem; flex-shrink:0;
+}
+.send-error-bar span { flex:1; line-height:1.4; }
+.err-dismiss {
+  background:none; border:none; cursor:pointer;
+  color:#f87171; font-size:1rem; padding:0 0.2rem; opacity:0.7; line-height:1;
+}
+.err-dismiss:hover { opacity:1; }
+.err-slide-enter-active, .err-slide-leave-active { transition: all 0.2s ease; }
+.err-slide-enter-from, .err-slide-leave-to { transform: translateY(4px); opacity:0; }
 
 .composer {
   display:flex; align-items:center; gap:0.5rem;
