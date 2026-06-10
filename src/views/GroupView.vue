@@ -260,6 +260,8 @@ watch(() => props.groupId, load);
 }
 .composer-input {
   flex:1; border-radius:24px !important;
-  background:var(--engage-input-bg) !important; border-color:transparent !important; font-size:0.93rem;
+  background:var(--engage-input-bg) !important; border-color:transparent !important;
+  font-size:0.93rem; color:#fff !important;
 }
+.composer-input::placeholder { color:rgba(255,255,255,0.4) !important; }
 </style>

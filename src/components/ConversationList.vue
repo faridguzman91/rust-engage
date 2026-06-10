@@ -375,12 +375,16 @@ function avatarLabel(name: string) {
 :deep(.p-tabpanel) { height:100%; padding:0; }
 
 .contacts-scroll { height:100%; overflow-y:auto; padding:0.25rem 0; }
-.contact-row { display:flex; align-items:center; gap:0.75rem; padding:0.7rem 1rem; cursor:pointer; transition:background 0.1s; }
+.contact-row { display:flex; align-items:center; gap:0.75rem; padding:0.7rem 1rem; cursor:pointer; transition:background 0.1s, color 0.1s; }
 .contact-row:hover { background:var(--engage-sidebar-hover); }
+.contact-row:hover .contact-name { color:#fff; font-weight:600; }
+.contact-row:hover .contact-sub  { color:rgba(255,255,255,0.55); }
 .contact-row.active { background:var(--engage-sidebar-active); }
+.contact-row.active .contact-name { color:#fff; font-weight:600; }
+.contact-row.active .contact-sub  { color:rgba(255,255,255,0.6); }
 .contact-info { display:flex; flex-direction:column; min-width:0; flex:1; }
-.contact-name { font-size:0.92rem; font-weight:500; color:var(--engage-text); }
-.contact-sub { font-size:0.72rem; color:var(--engage-muted); }
+.contact-name { font-size:0.92rem; font-weight:500; color:var(--engage-text); transition:color 0.1s, font-weight 0.1s; }
+.contact-sub  { font-size:0.72rem; color:var(--engage-muted); transition:color 0.1s; }
 .group-avatar { width:36px; height:36px; border-radius:50%; background:var(--engage-accent); color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .no-items { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.75rem; padding:3rem 1rem; color:var(--engage-muted); text-align:center; font-size:0.85rem; line-height:1.6; }
 

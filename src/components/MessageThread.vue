@@ -470,7 +470,9 @@ watch(msgs, (next, prev) => {
   background: var(--engage-input-bg) !important;
   border-color: transparent !important;
   font-size: 0.93rem;
+  color: #fff !important;
 }
+.composer-input::placeholder { color: rgba(255,255,255,0.4) !important; }
 .composer-input:focus {
   border-color: var(--engage-accent) !important;
   box-shadow: 0 0 0 1px var(--engage-accent) !important;
