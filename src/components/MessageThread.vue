@@ -195,15 +195,31 @@ watch(msgs, (next, prev) => {
             size="small"
             style="background:#4a4a78;color:#e8eaf6;font-weight:600;flex-shrink:0;align-self:flex-end;"
           />
-          <div class="bubble" :class="msg.isMine ? 'bubble-mine' : 'bubble-theirs'">
+          <div
+            class="bubble"
+            :class="[
+              msg.isMine ? 'bubble-mine' : 'bubble-theirs',
+              msg.isMine && msg.status === 'sending' ? 'bubble-sending' : '',
+              msg.isMine && msg.status === 'failed'  ? 'bubble-failed'  : '',
+            ]"
+          >
             <span class="bubble-body">{{ msg.body }}</span>
             <span class="bubble-meta">
               {{ formatTime(msg.timestamp) }}
+              <!-- @faridguzman: Status icon — clock=sending, warn=failed, check=sent, check-circle=delivered/read -->
               <i
                 v-if="msg.isMine"
-                class="pi"
-                :class="msg.status === 'read' ? 'pi-check-circle' : 'pi-check'"
-                style="font-size:0.65rem;"
+                class="pi status-icon"
+                :class="{
+                  'pi-clock':              msg.status === 'sending',
+                  'pi-exclamation-circle': msg.status === 'failed',
+                  'pi-check':              msg.status === 'sent',
+                  'pi-check-circle':       msg.status === 'delivered' || msg.status === 'read',
+                  'status-sending': msg.status === 'sending',
+                  'status-failed':  msg.status === 'failed',
+                  'status-read':    msg.status === 'read',
+                }"
+                :title="msg.status === 'failed' ? 'Not sent — will retry when online' : ''"
               />
               <!-- @faridguzman: Expiry countdown shown on disappearing messages -->
               <span v-if="msg.expiresAt" class="expiry-badge">
@@ -352,6 +368,31 @@ watch(msgs, (next, prev) => {
   gap: 0.25rem;
   white-space: nowrap;
 }
+
+/* @faridguzman: Sending — dimmed bubble with subtle pulse so it's clear
+   the message is in-flight but not yet confirmed by the server. */
+.bubble-sending {
+  opacity: 0.6;
+  animation: bubble-pulse 1.4s ease-in-out infinite;
+}
+@keyframes bubble-pulse {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 0.85; }
+}
+
+/* @faridguzman: Failed — red tint so the user immediately knows
+   the message did not reach the relay server. */
+.bubble-failed {
+  background: rgba(220, 53, 69, 0.18) !important;
+  border: 1px solid rgba(220, 53, 69, 0.45);
+  color: #f8d7da !important;
+}
+
+/* Status icon colours */
+.status-icon { font-size: 0.65rem; }
+.status-sending { opacity: 0.6; }
+.status-failed  { color: #f87171 !important; opacity: 1; }
+.status-read    { color: var(--engage-accent) !important; opacity: 1; }
 .expiry-badge {
   display: flex;
   align-items: center;
