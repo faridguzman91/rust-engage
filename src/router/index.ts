@@ -38,9 +38,10 @@ const router = createRouter({
       meta: { requiresAuth: true, requiresIdentity: true },
     },
     {
-      // @faridguzman: Group conversation thread
+      // @faridguzman: Group conversation — uses the same two-panel ChatView shell
+      // so the sidebar stays visible and back-navigation always works.
       path: "/group/:groupId",
-      component: () => import("../views/GroupView.vue"),
+      component: () => import("../views/ChatView.vue"),
       meta: { requiresAuth: true, requiresIdentity: true },
     },
     {

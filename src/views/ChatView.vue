@@ -1,15 +1,22 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- Copyright (C) 2024-2026 Farid Guzman <https://github.com/faridguzman91> -->
 <script setup lang="ts">
+// @faridguzman: Universal two-panel shell — sidebar always visible.
+// Renders MessageThread for 1:1 (/chat/:contactId) and GroupView for
+// groups (/group/:groupId).  Both routes point here so the sidebar is
+// never lost when navigating into a group conversation.
 import { onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { useContactsStore } from "../stores/contacts";
 import ConversationList from "../components/ConversationList.vue";
 import MessageThread from "../components/MessageThread.vue";
+import GroupView from "./GroupView.vue";
 
-const route = useRoute();
+const route    = useRoute();
 const contacts = useContactsStore();
+
 const activeContactId = () => route.params.contactId as string | undefined;
+const activeGroupId   = () => route.params.groupId   as string | undefined;
 
 onMounted(() => contacts.load());
 </script>
@@ -20,7 +27,8 @@ onMounted(() => contacts.load());
       <ConversationList />
     </aside>
     <main class="thread-pane">
-      <MessageThread v-if="activeContactId()" :contact-id="activeContactId()!" />
+      <MessageThread v-if="activeContactId()"  :contact-id="activeContactId()!" />
+      <GroupView     v-else-if="activeGroupId()" :group-id="activeGroupId()!" />
       <div v-else class="empty-state">
         <i class="pi pi-comments empty-icon" />
         <p>Select a conversation or<br />add a new contact</p>
