@@ -4,12 +4,14 @@
 // @faridguzman: Settings view — profile, identity keys, invite generation, sign out.
 import { ref } from "vue";
 import { useRouter } from "vue-router";
+import { useToast } from "primevue/usetoast";
 import { useIdentityStore } from "../stores/identity";
 import { useAuthStore } from "../stores/auth";
 import { useServerApi } from "../composables/useServerApi";
 import { openUrl as shellOpen } from "@tauri-apps/plugin-opener";
 import QRCode from "qrcode";
 import Panel from "primevue/panel";
+import Dialog from "primevue/dialog";
 import Button from "primevue/button";
 import Tag from "primevue/tag";
 import Divider from "primevue/divider";
@@ -19,13 +21,15 @@ const router   = useRouter();
 const identity = useIdentityStore();
 const auth     = useAuthStore();
 const api      = useServerApi();
+const toast    = useToast();
 
 // ── Invite state ──────────────────────────────────────────────────────────────
-const inviteUrl    = ref("");
-const inviteQr     = ref("");   // data URL rendered by qrcode
-const inviteExpiry = ref<number | null>(null);
+const inviteUrl     = ref("");
+const inviteQr      = ref("");
+const inviteExpiry  = ref<number | null>(null);
 const inviteLoading = ref(false);
-const copied       = ref(false);
+const copied        = ref(false);
+const showInviteDialog = ref(false);  // @faridguzman: modal visibility
 
 async function generateInvite() {
   inviteLoading.value = true;
@@ -33,13 +37,22 @@ async function generateInvite() {
     const result = await api.createInvite();
     inviteUrl.value    = result.url;
     inviteExpiry.value = result.expiresAt;
-    // @faridguzman: Render QR with brand colours — dark chip on dark background
     inviteQr.value = await QRCode.toDataURL(result.url, {
       width: 220,
       margin: 2,
       color: { dark: "#e8eaf6", light: "#1e1e2e" },
     });
-  } catch {
+    // @faridguzman: Open modal immediately so the user sees the link
+    showInviteDialog.value = true;
+  } catch (err: unknown) {
+    // @faridguzman: Surface the real error instead of silently doing nothing
+    const msg = err instanceof Error ? err.message : String(err);
+    let detail = "Could not generate invite link.";
+    if (msg.includes("401") || msg.includes("session")) detail = "Session expired — please sign in again.";
+    else if (msg.includes("fetch") || msg.includes("network") || msg.includes("Failed to fetch"))
+      detail = "Cannot reach the server. Check your connection.";
+    else detail = `Error: ${msg}`;
+    toast.add({ severity: "error", summary: "Invite failed", detail, life: 5000 });
     inviteUrl.value = "";
   } finally {
     inviteLoading.value = false;
@@ -192,6 +205,53 @@ function logout() {
       </Panel>
     </div>
   </div>
+
+  <!-- @faridguzman: Invite modal — pops up immediately after generation -->
+  <Dialog
+    v-model:visible="showInviteDialog"
+    header="Your invite link"
+    :modal="true"
+    :draggable="false"
+    :style="{ width: '420px' }"
+    class="invite-dialog"
+  >
+    <div class="invite-modal-body">
+      <!-- QR code -->
+      <div class="qr-wrap">
+        <img :src="inviteQr" alt="Invite QR code" class="qr-img" />
+        <p class="qr-hint">Scan to add contact</p>
+      </div>
+
+      <!-- Link + copy -->
+      <div class="invite-link-row">
+        <InputText
+          :model-value="inviteUrl"
+          readonly
+          class="invite-link-input"
+          style="font-size:0.78rem;"
+        />
+        <Button
+          :icon="copied ? 'pi pi-check' : 'pi pi-copy'"
+          :severity="copied ? 'success' : 'secondary'"
+          outlined
+          size="small"
+          v-tooltip.top="copied ? 'Copied!' : 'Copy link'"
+          @click="copyLink"
+        />
+      </div>
+
+      <p v-if="inviteExpiry" class="invite-expiry">
+        <i class="pi pi-clock" style="font-size:0.75rem;" />
+        {{ formatExpiry(inviteExpiry) }}
+      </p>
+
+      <!-- Share -->
+      <div class="share-row">
+        <Button label="Email" icon="pi pi-envelope" size="small" severity="secondary" outlined @click="shareEmail" />
+        <Button label="SMS"   icon="pi pi-comment"  size="small" severity="secondary" outlined @click="shareSms" />
+      </div>
+    </div>
+  </Dialog>
 </template>
 
 <style scoped>
@@ -292,5 +352,13 @@ function logout() {
 .share-row {
   display: flex;
   gap: 0.6rem;
+}
+
+/* @faridguzman: Invite modal body */
+.invite-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0.25rem 0;
 }
 </style>
