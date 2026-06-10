@@ -371,8 +371,11 @@ function avatarLabel(name: string) {
 
 .sidebar-tabs { flex:1; display:flex; flex-direction:column; overflow:hidden; }
 :deep(.p-tabs) { flex:1; display:flex; flex-direction:column; }
-:deep(.p-tabpanels) { flex:1; overflow:hidden; padding:0; }
-:deep(.p-tabpanel) { height:100%; padding:0; }
+/* @faridguzman: Force PrimeVue Aura tab panels to use the sidebar dark
+   background — Aura renders a light surface by default which makes
+   light-coloured text invisible on unselected rows. */
+:deep(.p-tabpanels) { flex:1; overflow:hidden; padding:0; background:var(--engage-sidebar-bg) !important; }
+:deep(.p-tabpanel)  { height:100%; padding:0; background:var(--engage-sidebar-bg) !important; }
 
 .contacts-scroll { height:100%; overflow-y:auto; padding:0.25rem 0; }
 .contact-row { display:flex; align-items:center; gap:0.75rem; padding:0.7rem 1rem; cursor:pointer; transition:background 0.1s, color 0.1s; }
@@ -383,8 +386,10 @@ function avatarLabel(name: string) {
 .contact-row.active .contact-name { color:#fff; font-weight:600; }
 .contact-row.active .contact-sub  { color:rgba(255,255,255,0.6); }
 .contact-info { display:flex; flex-direction:column; min-width:0; flex:1; }
-.contact-name { font-size:0.92rem; font-weight:500; color:var(--engage-text); transition:color 0.1s, font-weight 0.1s; }
-.contact-sub  { font-size:0.72rem; color:var(--engage-muted); transition:color 0.1s; }
+/* @faridguzman: #d0d3e8 — readable on the dark sidebar without being
+   full white, so hover/active white (#fff) gives a clear visual step up. */
+.contact-name { font-size:0.92rem; font-weight:500; color:#d0d3e8; transition:color 0.1s, font-weight 0.1s; }
+.contact-sub  { font-size:0.72rem; color:#7b80a0; transition:color 0.1s; }
 .group-avatar { width:36px; height:36px; border-radius:50%; background:var(--engage-accent); color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .no-items { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0.75rem; padding:3rem 1rem; color:var(--engage-muted); text-align:center; font-size:0.85rem; line-height:1.6; }
 
